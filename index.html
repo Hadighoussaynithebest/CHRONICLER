@@ -1,0 +1,1594 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CHRONICLER — History AI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;900&family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #0d0b08; --surface: #16120c; --surface2: #1e1810; --surface3: #251e14;
+  --border: rgba(180,140,60,0.12); --border2: rgba(180,140,60,0.22);
+  --gold: #c8923a; --gold2: #e8c06a; --gold-dim: rgba(200,146,58,0.15);
+  --crimson: #8b2020; --crimson-light: #c44040;
+  --parchment: #e8d9b0; --parchment-dim: #a89060;
+  --text: #ddd0b0; --muted: #6a5a3a; --muted2: #8a7050;
+  --green: #4a9e6e; --blue: #4a7a9e;
+}
+html, body { height: 100%; background: var(--bg); color: var(--text); font-family: 'Crimson Pro', serif; overflow: hidden; }
+.bg-parchment {
+  position: fixed; inset: 0; z-index: 0;
+  background: radial-gradient(ellipse 80% 60% at 20% 20%, rgba(200,146,58,0.05) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 80% at 80% 80%, rgba(139,32,32,0.05) 0%, transparent 60%),
+    radial-gradient(ellipse 100% 100% at 50% 50%, rgba(200,146,58,0.02) 0%, transparent 70%);
+  animation: bgBreath 12s ease-in-out infinite;
+}
+@keyframes bgBreath { 0%,100%{opacity:1}50%{opacity:0.6} }
+.bg-lines {
+  position: fixed; inset: 0; z-index: 0; opacity: 0.4;
+  background-image: repeating-linear-gradient(0deg, transparent, transparent 59px, rgba(180,140,60,0.04) 59px, rgba(180,140,60,0.04) 60px),
+    repeating-linear-gradient(90deg, transparent, transparent 59px, rgba(180,140,60,0.03) 59px, rgba(180,140,60,0.03) 60px);
+}
+.bg-vignette { position: fixed; inset: 0; z-index: 0; pointer-events: none; background: radial-gradient(ellipse 100% 100% at 50% 50%, transparent 40%, rgba(0,0,0,0.65) 100%); }
+.scanline { position: fixed; inset: 0; z-index: 99; pointer-events: none; background: repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(0,0,0,0.012) 3px, rgba(0,0,0,0.012) 4px); }
+.shell { position: relative; z-index: 1; height: 100vh; display: grid; grid-template-columns: 262px 1fr; }
+.sidebar { border-right: 1px solid var(--border2); display: flex; flex-direction: column; background: rgba(13,11,8,0.7); backdrop-filter: blur(10px); animation: sideIn 0.7s cubic-bezier(0.16,1,0.3,1) both; overflow: hidden; }
+@keyframes sideIn { from{opacity:0;transform:translateX(-20px)} to{opacity:1;transform:translateX(0)} }
+.sidebar-header { padding: 18px 16px 13px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.logo { display: flex; align-items: center; gap: 10px; margin-bottom: 2px; }
+.logo-icon { width: 32px; height: 32px; border: 1px solid var(--border2); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 1rem; background: var(--surface); flex-shrink: 0; animation: iconGlow 4s ease-in-out infinite; }
+@keyframes iconGlow { 0%,100%{box-shadow:0 0 0 rgba(200,146,58,0)} 50%{box-shadow:0 0 16px rgba(200,146,58,0.35)} }
+.logo-name { font-family: 'Cinzel', serif; font-weight: 900; font-size: 0.95rem; letter-spacing: 0.15em; color: var(--gold2); }
+.logo-tagline { font-size: 0.58rem; color: var(--muted); font-style: italic; margin-left: 42px; }
+.sidebar-tabs { display: flex; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.stab { flex: 1; padding: 8px 4px; text-align: center; cursor: pointer; font-family: 'Space Mono', monospace; font-size: 0.48rem; letter-spacing: 0.1em; color: var(--muted); border-bottom: 2px solid transparent; transition: all 0.2s; text-transform: uppercase; }
+.stab:hover { color: var(--parchment-dim); }
+.stab.active { color: var(--gold2); border-bottom-color: var(--gold); }
+.sidebar-panel { flex: 1; overflow-y: auto; display: none; }
+.sidebar-panel.active { display: flex; flex-direction: column; }
+.sidebar-panel::-webkit-scrollbar { width: 3px; }
+.sidebar-panel::-webkit-scrollbar-thumb { background: var(--surface3); }
+.section-pad { padding: 12px 14px; }
+.section-label { font-family: 'Space Mono', monospace; font-size: 0.5rem; letter-spacing: 0.18em; color: var(--muted); text-transform: uppercase; margin-bottom: 8px; }
+.era-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+.era-btn { padding: 7px 5px; background: var(--surface); border: 1px solid var(--border); border-radius: 7px; color: var(--parchment-dim); font-family: 'Crimson Pro', serif; font-size: 0.7rem; cursor: pointer; transition: all 0.2s; text-align: center; line-height: 1.3; }
+.era-btn:hover, .era-btn.active { border-color: var(--gold); color: var(--gold2); background: var(--gold-dim); }
+.era-btn .era-icon { display: block; font-size: 0.9rem; margin-bottom: 2px; }
+.topic-chip { display: flex; align-items: center; gap: 7px; padding: 8px 9px; border-radius: 7px; cursor: pointer; color: var(--muted2); font-size: 0.72rem; transition: all 0.2s; margin-bottom: 2px; }
+.topic-chip:hover { background: var(--gold-dim); color: var(--parchment); }
+.topic-chip .tc-icon { font-size: 0.85rem; flex-shrink: 0; }
+.otd-section { padding: 10px 14px 14px; }
+.otd-card { background: var(--surface); border: 1px solid var(--border2); border-radius: 9px; padding: 10px 12px; position: relative; overflow: hidden; }
+.otd-card::before { content:''; position: absolute; top:0; left:0; width:3px; height:100%; background: linear-gradient(to bottom, var(--gold), var(--crimson)); }
+.otd-label { font-family: 'Space Mono', monospace; font-size: 0.5rem; letter-spacing: 0.18em; color: var(--gold); text-transform: uppercase; margin-bottom: 5px; }
+.otd-text { font-size: 0.7rem; line-height: 1.5; color: var(--parchment-dim); font-style: italic; }
+.otd-ask { display: inline-block; margin-top: 6px; font-size: 0.58rem; color: var(--gold); cursor: pointer; border-bottom: 1px dashed rgba(200,146,58,0.3); font-family: 'Space Mono', monospace; transition: color 0.2s; }
+.otd-ask:hover { color: var(--gold2); }
+.saved-list { padding: 10px 14px; flex: 1; }
+.saved-item { padding: 10px 11px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 6px; cursor: pointer; transition: all 0.2s; position: relative; }
+.saved-item:hover { border-color: var(--gold); background: var(--gold-dim); }
+.saved-item-title { font-size: 0.73rem; color: var(--parchment-dim); line-height: 1.4; margin-bottom: 3px; }
+.saved-item-meta { font-family: 'Space Mono', monospace; font-size: 0.48rem; color: var(--muted); }
+.saved-item-del { position: absolute; top: 7px; right: 8px; background: none; border: none; color: var(--muted); font-size: 0.7rem; cursor: pointer; opacity: 0; transition: opacity 0.2s; }
+.saved-item:hover .saved-item-del { opacity: 1; }
+.saved-empty { text-align: center; padding: 30px 16px; font-size: 0.75rem; color: var(--muted); font-style: italic; }
+.figure-card { margin: 5px 14px; padding: 11px 13px; background: var(--surface); border: 1px solid var(--border); border-radius: 9px; cursor: pointer; transition: all 0.2s; }
+.figure-card:hover { border-color: var(--gold); background: var(--gold-dim); }
+.figure-name { font-family: 'Cinzel', serif; font-size: 0.75rem; color: var(--gold2); margin-bottom: 2px; }
+.figure-dates { font-family: 'Space Mono', monospace; font-size: 0.48rem; color: var(--muted); margin-bottom: 4px; }
+.figure-desc { font-size: 0.68rem; color: var(--parchment-dim); line-height: 1.4; font-style: italic; }
+.main { display: flex; flex-direction: column; overflow: hidden; animation: mainIn 0.6s 0.1s cubic-bezier(0.16,1,0.3,1) both; }
+@keyframes mainIn { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+.topbar { padding: 11px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; background: rgba(13,11,8,0.3); backdrop-filter: blur(4px); }
+.topbar-left { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+.era-badge { padding: 4px 10px; border: 1px solid var(--border2); border-radius: 100px; font-family: 'Cinzel', serif; font-size: 0.58rem; color: var(--gold); letter-spacing: 0.1em; background: var(--gold-dim); white-space: nowrap; }
+.mode-pills { display: flex; gap: 4px; }
+.mode-pill { padding: 4px 9px; border: 1px solid var(--border); border-radius: 100px; font-family: 'Space Mono', monospace; font-size: 0.52rem; color: var(--muted2); cursor: pointer; transition: all 0.2s; letter-spacing: 0.06em; }
+.mode-pill:hover { border-color: var(--gold); color: var(--gold); }
+.mode-pill.active { border-color: var(--gold); color: var(--gold2); background: var(--gold-dim); }
+.topbar-actions { display: flex; gap: 5px; align-items: center; }
+.icon-btn { width: 30px; height: 30px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; color: var(--muted2); transition: all 0.2s; position: relative; }
+.icon-btn:hover { border-color: var(--gold); color: var(--gold); }
+.icon-btn .tooltip { position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%); background: var(--surface3); border: 1px solid var(--border2); border-radius: 5px; padding: 4px 8px; font-family: 'Space Mono', monospace; font-size: 0.46rem; color: var(--parchment-dim); white-space: nowrap; pointer-events: none; opacity: 0; transition: opacity 0.15s; letter-spacing: 0.07em; }
+.icon-btn:hover .tooltip { opacity: 1; }
+.timeline-strip { padding: 7px 20px; border-bottom: 1px solid var(--border); display: flex; overflow-x: auto; flex-shrink: 0; scrollbar-width: none; background: rgba(13,11,8,0.4); align-items: center; }
+.timeline-strip::-webkit-scrollbar { display: none; }
+.tl-item { flex-shrink: 0; display: flex; align-items: center; cursor: pointer; }
+.tl-node { width: 7px; height: 7px; border-radius: 50%; border: 1px solid var(--gold); background: var(--bg); transition: all 0.2s; flex-shrink: 0; }
+.tl-item:hover .tl-node { background: var(--gold); box-shadow: 0 0 8px var(--gold); }
+.tl-label { font-family: 'Space Mono', monospace; font-size: 0.46rem; color: var(--muted); white-space: nowrap; padding: 0 7px; transition: color 0.2s; line-height: 1.3; text-align: center; }
+.tl-item:hover .tl-label { color: var(--gold); }
+.tl-line { width: 18px; height: 1px; background: linear-gradient(to right, var(--gold), rgba(200,146,58,0.2)); flex-shrink: 0; }
+.messages { flex: 1; overflow-y: auto; padding: 22px 24px; display: flex; flex-direction: column; gap: 18px; scrollbar-width: thin; scrollbar-color: var(--surface3) transparent; }
+.messages::-webkit-scrollbar { width: 4px; }
+.messages::-webkit-scrollbar-thumb { background: var(--surface3); border-radius: 4px; }
+.welcome { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; text-align: center; padding: 20px 30px; flex: 1; animation: fadeUp 0.8s 0.4s both; }
+@keyframes fadeUp { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
+.welcome-emblem { width: 72px; height: 72px; border-radius: 50%; border: 1px solid var(--border2); background: var(--surface); display: flex; align-items: center; justify-content: center; font-size: 2rem; position: relative; animation: emblemGlow 4s ease-in-out infinite; }
+@keyframes emblemGlow { 0%,100%{box-shadow:0 0 0 rgba(200,146,58,0)} 50%{box-shadow:0 0 30px rgba(200,146,58,0.3)} }
+.welcome-emblem::before { content:''; position:absolute; inset:-7px; border-radius:50%; border: 1px dashed rgba(200,146,58,0.2); animation: spin 30s linear infinite; }
+@keyframes spin { to{transform:rotate(360deg)} }
+.welcome h2 { font-family:'Cinzel',serif; font-weight:700; font-size:1.4rem; letter-spacing:0.08em; color:var(--gold2); }
+.welcome .sub { font-size:0.88rem; color:var(--muted2); line-height:1.7; max-width:400px; font-style:italic; }
+.divider { width:100px; height:1px; background:linear-gradient(to right, transparent, var(--gold), transparent); opacity:0.3; }
+.starters { display:grid; grid-template-columns:1fr 1fr; gap:7px; width:100%; max-width:540px; }
+.starter-btn { padding: 10px 13px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; color: var(--parchment-dim); font-family: 'Crimson Pro', serif; font-size: 0.8rem; text-align: left; cursor: pointer; transition: all 0.2s; line-height: 1.4; font-style: italic; }
+.starter-btn:hover { border-color: var(--gold); background: var(--gold-dim); color: var(--parchment); transform: translateY(-1px); }
+.msg { display:flex; gap:12px; animation: msgIn 0.4s cubic-bezier(0.16,1,0.3,1) both; }
+@keyframes msgIn { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+.msg.user { flex-direction: row-reverse; }
+.msg-avatar { width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; }
+.msg.ai .msg-avatar { background: radial-gradient(circle at 30% 30%, var(--gold) 0%, #6b3a0a 100%); border: 1px solid rgba(200,146,58,0.4); box-shadow: 0 0 12px rgba(200,146,58,0.2); }
+.msg.user .msg-avatar { background: var(--surface2); border: 1px solid var(--border); font-size: 0.65rem; color: var(--muted2); }
+.msg-body { max-width: 76%; display: flex; flex-direction: column; gap: 5px; }
+.msg.user .msg-body { align-items: flex-end; }
+.msg-label { font-family:'Space Mono',monospace; font-size:0.49rem; color:var(--muted); letter-spacing:0.14em; text-transform:uppercase; }
+.msg-bubble { padding: 12px 16px; border-radius: 14px; font-size: 0.9rem; line-height: 1.8; white-space: pre-wrap; word-break: break-word; }
+.msg.ai .msg-bubble { background: var(--surface); border: 1px solid var(--border2); border-top-left-radius: 4px; color: var(--parchment); position: relative; }
+.msg.ai .msg-bubble::before { content:''; position:absolute; top:0; left:0; right:0; height:1px; background: linear-gradient(to right, var(--gold), transparent); opacity: 0.35; border-radius: 14px 14px 0 0; }
+.msg.user .msg-bubble { background: linear-gradient(135deg, #3a2400, #57380c); border: 1px solid rgba(200,146,58,0.28); border-top-right-radius: 4px; color: var(--parchment); }
+.msg-actions { display:flex; gap:5px; opacity:0; transition:opacity 0.2s; flex-wrap: wrap; }
+.msg:hover .msg-actions { opacity:1; }
+.msg-action-btn { padding: 3px 8px; background: var(--surface2); border: 1px solid var(--border); border-radius: 5px; font-family: 'Space Mono', monospace; font-size: 0.48rem; color: var(--muted); cursor: pointer; transition: all 0.15s; letter-spacing: 0.07em; }
+.msg-action-btn:hover { border-color: var(--gold); color: var(--gold); }
+.msg-action-btn.saved { border-color: var(--green); color: var(--green); }
+.source-strip { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 6px; }
+.source-tag { padding: 2px 8px; background: rgba(74,122,158,0.1); border: 1px solid rgba(74,122,158,0.25); border-radius: 100px; font-family: 'Space Mono', monospace; font-size: 0.44rem; color: var(--blue); letter-spacing: 0.06em; }
+.msg-wc { font-family:'Space Mono',monospace; font-size:0.44rem; color:var(--muted); letter-spacing:0.08em; margin-top:2px; }
+.typing-indicator { display: flex; align-items: center; gap: 5px; padding: 12px 16px; background: var(--surface); border: 1px solid var(--border2); border-radius: 14px; border-top-left-radius: 4px; width: fit-content; }
+.typing-dot { width:6px; height:6px; border-radius:50%; background:var(--gold); animation: typingBounce 1.4s ease-in-out infinite; }
+.typing-dot:nth-child(2){animation-delay:0.2s} .typing-dot:nth-child(3){animation-delay:0.4s}
+@keyframes typingBounce { 0%,60%,100%{transform:translateY(0);opacity:0.3} 30%{transform:translateY(-7px);opacity:1} }
+.input-area { padding: 12px 20px 15px; flex-shrink: 0; background: rgba(13,11,8,0.4); backdrop-filter: blur(4px); border-top: 1px solid var(--border); }
+.input-tools { display: flex; gap: 6px; margin-bottom: 8px; align-items: center; flex-wrap: wrap; }
+.input-tool-btn { padding: 4px 10px; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; font-family: 'Space Mono', monospace; font-size: 0.5rem; color: var(--muted2); cursor: pointer; transition: all 0.2s; letter-spacing: 0.06em; display: flex; align-items: center; gap: 4px; }
+.input-tool-btn:hover { border-color: var(--gold); color: var(--gold); }
+.input-tool-btn.recording { border-color: var(--crimson-light); color: var(--crimson-light); animation: recordPulse 1s ease-in-out infinite; }
+@keyframes recordPulse { 0%,100%{opacity:1}50%{opacity:0.5} }
+.suggestion-chips { display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 8px; }
+.sug-chip { padding: 3px 10px; background: var(--surface); border: 1px solid var(--border); border-radius: 100px; font-family: 'Crimson Pro', serif; font-size: 0.7rem; color: var(--muted2); cursor: pointer; transition: all 0.2s; font-style: italic; animation: chipIn 0.3s cubic-bezier(0.16,1,0.3,1) both; }
+.sug-chip:hover { border-color: var(--gold); color: var(--parchment); background: var(--gold-dim); }
+@keyframes chipIn { from{opacity:0;transform:scale(0.9)} to{opacity:1;transform:scale(1)} }
+.input-wrap { display: flex; align-items: flex-end; gap: 9px; background: var(--surface); border: 1px solid var(--border2); border-radius: 13px; padding: 10px 10px 10px 15px; transition: border-color 0.2s, box-shadow 0.2s; }
+.input-wrap:focus-within { border-color: rgba(200,146,58,0.45); box-shadow: 0 0 0 3px rgba(200,146,58,0.05), 0 0 24px rgba(200,146,58,0.06); }
+#user-input { flex:1; background:none; border:none; outline:none; color:var(--parchment); font-family:'Crimson Pro',serif; font-size:0.93rem; line-height:1.5; resize:none; max-height:120px; min-height:24px; scrollbar-width:thin; }
+#user-input::placeholder { color:var(--muted); font-style:italic; }
+.send-btn { width:36px; height:36px; border-radius:9px; border:none; cursor:pointer; background:linear-gradient(135deg, var(--gold), #8b5e1a); display:flex; align-items:center; justify-content:center; flex-shrink:0; transition:all 0.2s; box-shadow:0 4px 12px rgba(200,146,58,0.3); }
+.send-btn:hover:not(:disabled) { transform:scale(1.06); box-shadow:0 6px 20px rgba(200,146,58,0.5); }
+.send-btn:active:not(:disabled) { transform:scale(0.96); }
+.send-btn:disabled { opacity:0.35; cursor:not-allowed; transform:none; box-shadow:none; }
+.send-btn svg { color:var(--bg); }
+.input-footer { display:flex; align-items:center; justify-content:space-between; margin-top:6px; }
+.input-hint { font-size:0.54rem; color:var(--muted); font-family:'Space Mono',monospace; }
+.input-hint span { color:var(--gold); }
+.char-count { font-size:0.52rem; color:var(--muted); font-family:'Space Mono',monospace; }
+.modal-overlay { position:fixed; inset:0; z-index:200; background:rgba(0,0,0,0.75); backdrop-filter:blur(6px); display:flex; align-items:center; justify-content:center; opacity:0; pointer-events:none; transition:opacity 0.3s; }
+.modal-overlay.open { opacity:1; pointer-events:all; }
+.modal { background:var(--surface); border:1px solid var(--border2); border-radius:16px; padding:26px; max-width:560px; width:92%; max-height:80vh; overflow-y:auto; transform:scale(0.93); transition:transform 0.3s; position:relative; }
+.modal-overlay.open .modal { transform:scale(1); }
+.modal h3 { font-family:'Cinzel',serif; font-size:0.95rem; color:var(--gold2); letter-spacing:0.1em; margin-bottom:16px; }
+.modal-close { position:absolute; top:14px; right:16px; background:none; border:none; color:var(--muted); cursor:pointer; font-size:1.1rem; transition:color 0.2s; }
+.modal-close:hover { color:var(--parchment); }
+.quiz-score { font-family:'Cinzel',serif; font-size:1.8rem; color:var(--gold2); text-align:center; margin:10px 0 4px; }
+.quiz-label { font-size:0.7rem; color:var(--muted); text-align:center; margin-bottom:16px; font-family:'Space Mono',monospace; }
+.quiz-stat-row { display:flex; gap:10px; margin-bottom:20px; }
+.quiz-stat { flex:1; background:var(--surface2); border:1px solid var(--border); border-radius:9px; padding:10px; text-align:center; }
+.quiz-stat .num { font-family:'Cinzel',serif; font-size:1.3rem; color:var(--gold); }
+.quiz-stat .lbl { font-family:'Space Mono',monospace; font-size:0.48rem; color:var(--muted); margin-top:2px; letter-spacing:0.1em; }
+.quiz-badges { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:12px; }
+.badge { padding:4px 12px; border-radius:100px; font-family:'Space Mono',monospace; font-size:0.52rem; letter-spacing:0.08em; border:1px solid; }
+.badge.gold { border-color:var(--gold); color:var(--gold2); background:var(--gold-dim); }
+.badge.silver { border-color:#aaa; color:#ccc; background:rgba(170,170,170,0.1); }
+.badge.crimson { border-color:var(--crimson-light); color:var(--crimson-light); background:rgba(139,32,32,0.1); }
+.map-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.map-region { background:var(--surface2); border:1px solid var(--border); border-radius:9px; padding:11px 13px; cursor:pointer; transition:all 0.2s; }
+.map-region:hover { border-color:var(--gold); background:var(--gold-dim); }
+.map-region .region-name { font-family:'Cinzel',serif; font-size:0.72rem; color:var(--gold2); margin-bottom:4px; }
+.map-region .region-desc { font-size:0.68rem; color:var(--parchment-dim); font-style:italic; line-height:1.4; }
+.compare-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:10px; }
+.compare-col { background:var(--surface2); border:1px solid var(--border); border-radius:9px; padding:12px; }
+.compare-col h4 { font-family:'Cinzel',serif; font-size:0.72rem; color:var(--gold2); margin-bottom:8px; }
+.compare-input { width:100%; background:var(--surface); border:1px solid var(--border2); border-radius:7px; padding:8px 10px; color:var(--parchment); font-family:'Crimson Pro',serif; font-size:0.82rem; outline:none; transition:border-color 0.2s; }
+.compare-input:focus { border-color:var(--gold); }
+.compare-btn { width:100%; margin-top:12px; padding:10px; background:linear-gradient(135deg, var(--gold), #8b5e1a); border:none; border-radius:9px; font-family:'Cinzel',serif; font-size:0.72rem; letter-spacing:0.1em; color:var(--bg); cursor:pointer; transition:all 0.2s; }
+.compare-btn:hover { opacity:0.9; transform:translateY(-1px); }
+.search-input-wrap { display:flex; gap:8px; margin-bottom:14px; background:var(--surface2); border:1px solid var(--border2); border-radius:9px; padding:9px 12px; transition:border-color 0.2s; }
+.search-input-wrap:focus-within { border-color:var(--gold); }
+.search-input { flex:1; background:none; border:none; outline:none; color:var(--parchment); font-family:'Crimson Pro',serif; font-size:0.9rem; font-style:italic; }
+.search-input::placeholder { color:var(--muted); }
+.search-results { display:flex; flex-direction:column; gap:6px; }
+.search-result { padding:10px 12px; background:var(--surface2); border:1px solid var(--border); border-radius:8px; cursor:pointer; transition:all 0.2s; }
+.search-result:hover { border-color:var(--gold); background:var(--gold-dim); }
+.search-result .sr-q { font-size:0.75rem; color:var(--parchment-dim); line-height:1.4; }
+.search-result .sr-meta { font-family:'Space Mono',monospace; font-size:0.48rem; color:var(--muted); margin-top:3px; }
+.export-options { display:flex; flex-direction:column; gap:8px; margin-top:10px; }
+.export-btn-row { display:flex; align-items:center; gap:12px; padding:12px 14px; background:var(--surface2); border:1px solid var(--border); border-radius:9px; cursor:pointer; transition:all 0.2s; }
+.export-btn-row:hover { border-color:var(--gold); background:var(--gold-dim); }
+.export-icon { font-size:1.4rem; }
+.export-info .export-title { font-family:'Cinzel',serif; font-size:0.72rem; color:var(--gold2); margin-bottom:2px; }
+.export-info .export-desc { font-size:0.68rem; color:var(--muted2); font-style:italic; }
+.progress-overlay { position:fixed; inset:0; z-index:300; background:rgba(0,0,0,0.7); backdrop-filter:blur(8px); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; opacity:0; pointer-events:none; transition:opacity 0.3s; }
+.progress-overlay.open { opacity:1; pointer-events:all; }
+.progress-title { font-family:'Cinzel',serif; font-size:1rem; color:var(--gold2); letter-spacing:0.1em; }
+.progress-bar-wrap { width:260px; height:4px; background:var(--surface3); border-radius:2px; overflow:hidden; }
+.progress-bar { height:100%; background:linear-gradient(to right, var(--gold), var(--gold2)); width:0%; transition:width 0.3s; border-radius:2px; }
+.progress-sub { font-family:'Space Mono',monospace; font-size:0.58rem; color:var(--muted); letter-spacing:0.1em; }
+.toast { position:fixed; bottom:22px; right:22px; z-index:400; padding:9px 15px; background:var(--surface); border:1px solid var(--border2); border-radius:9px; font-size:0.68rem; color:var(--parchment-dim); font-family:'Space Mono',monospace; transform:translateY(60px); opacity:0; transition:all 0.3s cubic-bezier(0.16,1,0.3,1); pointer-events:none; }
+.toast.show { transform:translateY(0); opacity:1; }
+.error-bubble { padding:10px 14px; background:rgba(139,32,32,0.1); border:1px solid rgba(139,32,32,0.3); border-radius:10px; font-size:0.78rem; color:var(--crimson-light); animation:msgIn 0.3s both; }
+.scroll-btn { position:absolute; bottom:160px; right:28px; z-index:10; width:32px; height:32px; border-radius:50%; background:var(--surface); border:1px solid var(--border2); cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:0.8rem; color:var(--gold); box-shadow:0 4px 12px rgba(0,0,0,0.4); opacity:0; transform:translateY(10px); transition:all 0.3s; pointer-events:none; }
+.scroll-btn.visible { opacity:1; transform:translateY(0); pointer-events:all; }
+.scroll-btn:hover { background:var(--gold-dim); }
+.main-wrap { flex:1; display:flex; flex-direction:column; overflow:hidden; position:relative; }
+/* RESEARCH WORKSHOP */
+.rw-tabs { display:flex; gap:5px; flex-wrap:wrap; margin-bottom:18px; }
+.rw-tab { padding:5px 12px; border:1px solid var(--border); border-radius:100px; font-family:'Space Mono',monospace; font-size:0.52rem; color:var(--muted2); cursor:pointer; transition:all 0.2s; letter-spacing:0.07em; }
+.rw-tab:hover { border-color:var(--gold); color:var(--gold); }
+.rw-tab.active { border-color:var(--gold); color:var(--gold2); background:var(--gold-dim); }
+.rw-panel { display:none; flex-direction:column; gap:12px; }
+.rw-panel.active { display:flex; }
+.rw-label { font-family:'Space Mono',monospace; font-size:0.52rem; letter-spacing:0.13em; color:var(--muted); text-transform:uppercase; margin-bottom:4px; }
+.rw-input { width:100%; background:var(--surface2); border:1px solid var(--border2); border-radius:8px; padding:9px 12px; color:var(--parchment); font-family:'Crimson Pro',serif; font-size:0.88rem; outline:none; transition:border-color 0.2s; resize:vertical; min-height:60px; }
+.rw-input:focus { border-color:var(--gold); }
+.rw-select { width:100%; background:var(--surface2); border:1px solid var(--border2); border-radius:8px; padding:8px 12px; color:var(--parchment-dim); font-family:'Crimson Pro',serif; font-size:0.85rem; outline:none; cursor:pointer; }
+.rw-btn { padding:10px 16px; background:linear-gradient(135deg, var(--gold), #8b5e1a); border:none; border-radius:9px; font-family:'Cinzel',serif; font-size:0.68rem; letter-spacing:0.1em; color:var(--bg); cursor:pointer; transition:all 0.2s; align-self:flex-start; }
+.rw-btn:hover { opacity:0.9; transform:translateY(-1px); }
+.rw-btn:disabled { opacity:0.4; cursor:not-allowed; transform:none; }
+.rw-output { background:var(--surface2); border:1px solid var(--border2); border-radius:9px; padding:14px 16px; font-size:0.85rem; line-height:1.8; color:var(--parchment); white-space:pre-wrap; min-height:80px; max-height:320px; overflow-y:auto; display:none; position:relative; }
+.rw-output.visible { display:block; animation:fadeUp 0.3s both; }
+.rw-output-actions { display:flex; gap:6px; margin-top:8px; }
+.rw-output-actions { display:none; }
+.rw-output-actions.visible { display:flex; }
+.rw-out-btn { padding:4px 11px; background:var(--surface); border:1px solid var(--border2); border-radius:6px; font-family:'Space Mono',monospace; font-size:0.5rem; color:var(--muted2); cursor:pointer; transition:all 0.15s; letter-spacing:0.07em; }
+.rw-out-btn:hover { border-color:var(--gold); color:var(--gold); }
+.rw-spinning { display:inline-block; animation:spin 1s linear infinite; }
+.citation-style-row { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:4px; }
+.cite-style-btn { padding:4px 10px; border:1px solid var(--border); border-radius:100px; font-family:'Space Mono',monospace; font-size:0.5rem; color:var(--muted2); cursor:pointer; transition:all 0.2s; }
+.cite-style-btn:hover, .cite-style-btn.active { border-color:var(--gold); color:var(--gold2); background:var(--gold-dim); }
+.chrono-events { display:flex; flex-direction:column; gap:6px; margin-bottom:8px; }
+.chrono-event-row { display:flex; gap:6px; align-items:center; }
+.chrono-year-input { width:90px; background:var(--surface2); border:1px solid var(--border2); border-radius:7px; padding:7px 9px; color:var(--parchment); font-family:'Space Mono',monospace; font-size:0.7rem; outline:none; }
+.chrono-event-input { flex:1; background:var(--surface2); border:1px solid var(--border2); border-radius:7px; padding:7px 10px; color:var(--parchment); font-family:'Crimson Pro',serif; font-size:0.82rem; outline:none; }
+.chrono-del { width:26px; height:26px; background:none; border:1px solid var(--border); border-radius:6px; color:var(--muted); cursor:pointer; font-size:0.75rem; display:flex; align-items:center; justify-content:center; transition:all 0.15s; flex-shrink:0; }
+.chrono-del:hover { border-color:var(--crimson-light); color:var(--crimson-light); }
+.chrono-add { padding:5px 12px; background:var(--surface); border:1px solid var(--border); border-radius:7px; font-family:'Space Mono',monospace; font-size:0.5rem; color:var(--muted2); cursor:pointer; transition:all 0.2s; letter-spacing:0.07em; align-self:flex-start; }
+.chrono-add:hover { border-color:var(--gold); color:var(--gold); }
+.doc-trans-wrap { display:flex; flex-direction:column; gap:10px; }
+.research-quick { padding:10px 14px; display:flex; flex-direction:column; gap:4px; }
+.rq-btn { display:flex; align-items:center; gap:8px; padding:9px 10px; border:1px solid var(--border); border-radius:8px; background:var(--surface); cursor:pointer; transition:all 0.2s; color:var(--parchment-dim); font-family:'Crimson Pro',serif; font-size:0.75rem; text-align:left; }
+.rq-btn:hover { border-color:var(--gold); background:var(--gold-dim); color:var(--parchment); }
+.rq-icon { font-size:1rem; flex-shrink:0; }
+.rq-info { flex:1; }
+.rq-title { font-size:0.75rem; margin-bottom:1px; }
+.rq-sub { font-family:'Space Mono',monospace; font-size:0.46rem; color:var(--muted); letter-spacing:0.07em; }
+::-webkit-scrollbar { width:4px; }
+::-webkit-scrollbar-thumb { background:var(--surface3); border-radius:4px; }
+</style>
+</head>
+<body>
+<div class="scanline"></div>
+<div class="bg-parchment"></div>
+<div class="bg-lines"></div>
+<div class="bg-vignette"></div>
+
+<!-- PROGRESS OVERLAY -->
+<div class="progress-overlay" id="progress-overlay">
+  <div class="progress-title">CONSULTING THE ARCHIVES</div>
+  <div class="progress-bar-wrap"><div class="progress-bar" id="progress-bar"></div></div>
+  <div class="progress-sub" id="progress-sub">Preparing response…</div>
+</div>
+
+<!-- MODAL: COMPARE -->
+<div class="modal-overlay" id="modal-compare">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('modal-compare')">✕</button>
+    <h3>⚖️ COMPARE TWO HISTORICAL SUBJECTS</h3>
+    <p style="font-size:0.75rem;color:var(--muted2);margin-bottom:14px;font-style:italic">Compare empires, battles, leaders, civilizations, revolutions — anything.</p>
+    <div class="compare-grid">
+      <div class="compare-col"><h4>SUBJECT A</h4><input class="compare-input" id="compare-a" placeholder="e.g. Roman Empire" /></div>
+      <div class="compare-col"><h4>SUBJECT B</h4><input class="compare-input" id="compare-b" placeholder="e.g. Mongol Empire" /></div>
+    </div>
+    <select id="compare-aspect" style="width:100%;margin-top:10px;background:var(--surface2);border:1px solid var(--border2);border-radius:7px;padding:8px 10px;color:var(--parchment-dim);font-family:Crimson Pro,serif;font-size:0.82rem;outline:none;">
+      <option>Overall comparison</option><option>Military power & strategy</option><option>Economy & trade</option><option>Culture & society</option><option>Rise & fall / decline</option><option>Historical legacy</option>
+    </select>
+    <button class="compare-btn" onclick="runCompare()">⚖️ COMPARE NOW</button>
+  </div>
+</div>
+
+<!-- MODAL: SEARCH -->
+<div class="modal-overlay" id="modal-search">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('modal-search')">✕</button>
+    <h3>🔍 SEARCH CONVERSATION</h3>
+    <div class="search-input-wrap"><input class="search-input" id="search-input" placeholder="Search messages…" oninput="doSearch()" /><span style="color:var(--muted);font-size:0.8rem">🔍</span></div>
+    <div class="search-results" id="search-results"></div>
+  </div>
+</div>
+
+<!-- MODAL: QUIZ SCORE -->
+<div class="modal-overlay" id="modal-quiz">
+  <div class="modal" style="max-width:400px;text-align:center">
+    <button class="modal-close" onclick="closeModal('modal-quiz')">✕</button>
+    <h3>🏺 YOUR HISTORY SCORE</h3>
+    <div class="quiz-score" id="quiz-score-num">0</div>
+    <div class="quiz-label">SCROLLS EARNED</div>
+    <div class="quiz-stat-row">
+      <div class="quiz-stat"><div class="num" id="qs-correct">0</div><div class="lbl">CORRECT</div></div>
+      <div class="quiz-stat"><div class="num" id="qs-total">0</div><div class="lbl">ATTEMPTED</div></div>
+      <div class="quiz-stat"><div class="num" id="qs-pct">—</div><div class="lbl">ACCURACY</div></div>
+    </div>
+    <div class="quiz-badges" id="quiz-badges" style="justify-content:center"></div>
+    <button onclick="closeModal('modal-quiz')" style="padding:9px 20px;background:var(--gold-dim);border:1px solid var(--gold);border-radius:8px;color:var(--gold2);font-family:Cinzel,serif;font-size:0.7rem;letter-spacing:0.1em;cursor:pointer;">CONTINUE STUDYING</button>
+  </div>
+</div>
+
+<!-- MODAL: EXPORT -->
+<div class="modal-overlay" id="modal-export">
+  <div class="modal" style="max-width:420px">
+    <button class="modal-close" onclick="closeModal('modal-export')">✕</button>
+    <h3>📤 EXPORT CONVERSATION</h3>
+    <div class="export-options">
+      <div class="export-btn-row" onclick="exportAs('txt')"><div class="export-icon">📄</div><div class="export-info"><div class="export-title">PLAIN TEXT (.txt)</div><div class="export-desc">Simple readable transcript</div></div></div>
+      <div class="export-btn-row" onclick="exportAs('md')"><div class="export-icon">📝</div><div class="export-info"><div class="export-title">MARKDOWN (.md)</div><div class="export-desc">For Obsidian, Notion, etc.</div></div></div>
+      <div class="export-btn-row" onclick="exportAs('html')"><div class="export-icon">🌐</div><div class="export-info"><div class="export-title">HTML PAGE</div><div class="export-desc">Styled page for any browser</div></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: RESEARCH WORKSHOP -->
+<div class="modal-overlay" id="modal-research">
+  <div class="modal" style="max-width:680px;width:95%">
+    <button class="modal-close" onclick="closeModal('modal-research')">✕</button>
+    <h3>🎓 RESEARCH WORKSHOP</h3>
+    <p style="font-size:0.75rem;color:var(--muted2);margin-bottom:14px;font-style:italic">AI-powered tools for historians, students, and researchers.</p>
+    <div class="rw-tabs">
+      <div class="rw-tab active" onclick="rwTab('thesis',this)">📌 Thesis</div>
+      <div class="rw-tab" onclick="rwTab('outline',this)">📋 Outline</div>
+      <div class="rw-tab" onclick="rwTab('bibliography',this)">📚 Bibliography</div>
+      <div class="rw-tab" onclick="rwTab('source',this)">🔍 Source Analysis</div>
+      <div class="rw-tab" onclick="rwTab('historiography',this)">🏛 Historiography</div>
+      <div class="rw-tab" onclick="rwTab('abstract',this)">📄 Abstract</div>
+      <div class="rw-tab" onclick="rwTab('argument',this)">⚔️ Arguments</div>
+    </div>
+    <!-- THESIS -->
+    <div class="rw-panel active" id="rwp-thesis">
+      <div><div class="rw-label">Research Topic or Question</div><textarea class="rw-input" id="rw-thesis-topic" placeholder="e.g. The role of disease in the fall of the Roman Empire" rows="2"></textarea></div>
+      <div><div class="rw-label">Paper Type</div><select class="rw-select" id="rw-thesis-type"><option>Undergraduate Essay</option><option>Graduate Thesis</option><option>Doctoral Dissertation</option><option>Journal Article</option><option>Research Paper</option><option>Book Chapter</option></select></div>
+      <div><div class="rw-label">Your Preliminary Argument (optional)</div><textarea class="rw-input" id="rw-thesis-arg" placeholder="Any initial thoughts or angle…" rows="2"></textarea></div>
+      <button class="rw-btn" onclick="rwGenerate('thesis')">📌 Generate Thesis Statement</button>
+      <div class="rw-output" id="rwo-thesis"></div>
+      <div class="rw-output-actions" id="rwoa-thesis"><button class="rw-out-btn" onclick="rwCopy('rwo-thesis')">Copy</button><button class="rw-out-btn" onclick="rwSendToChat('rwo-thesis')">Send to Chat →</button><button class="rw-out-btn" onclick="rwGenerate('thesis')">Regenerate</button></div>
+    </div>
+    <!-- OUTLINE -->
+    <div class="rw-panel" id="rwp-outline">
+      <div><div class="rw-label">Paper Topic / Thesis</div><textarea class="rw-input" id="rw-outline-topic" placeholder="e.g. How the Black Death transformed European feudalism" rows="2"></textarea></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div><div class="rw-label">Paper Length</div><select class="rw-select" id="rw-outline-length"><option>Short essay (1,500–3,000 words)</option><option>Medium paper (3,000–6,000 words)</option><option>Long paper (6,000–10,000 words)</option><option>Thesis / dissertation chapter</option></select></div>
+        <div><div class="rw-label">Methodology</div><select class="rw-select" id="rw-outline-method"><option>Analytical / argumentative</option><option>Narrative / chronological</option><option>Comparative</option><option>Thematic</option><option>Social history</option><option>Revisionist / historiographical</option></select></div>
+      </div>
+      <button class="rw-btn" onclick="rwGenerate('outline')">📋 Generate Full Outline</button>
+      <div class="rw-output" id="rwo-outline"></div>
+      <div class="rw-output-actions" id="rwoa-outline"><button class="rw-out-btn" onclick="rwCopy('rwo-outline')">Copy</button><button class="rw-out-btn" onclick="rwSendToChat('rwo-outline')">Send to Chat →</button><button class="rw-out-btn" onclick="rwExportTxt('rwo-outline','outline')">Download</button></div>
+    </div>
+    <!-- BIBLIOGRAPHY -->
+    <div class="rw-panel" id="rwp-bibliography">
+      <div><div class="rw-label">Research Topic</div><textarea class="rw-input" id="rw-bib-topic" placeholder="e.g. The causes of World War I, focus on Austro-Hungarian policy" rows="2"></textarea></div>
+      <div><div class="rw-label">Citation Style</div>
+      <div class="citation-style-row">
+        <div class="cite-style-btn active" onclick="selectCiteStyle(this,'Chicago')">Chicago</div>
+        <div class="cite-style-btn" onclick="selectCiteStyle(this,'Turabian')">Turabian</div>
+        <div class="cite-style-btn" onclick="selectCiteStyle(this,'MLA')">MLA 9th</div>
+        <div class="cite-style-btn" onclick="selectCiteStyle(this,'APA 7th')">APA 7th</div>
+        <div class="cite-style-btn" onclick="selectCiteStyle(this,'Harvard')">Harvard</div>
+        <div class="cite-style-btn" onclick="selectCiteStyle(this,'Oxford')">Oxford</div>
+      </div></div>
+      <div><div class="rw-label">Source Types</div><select class="rw-select" id="rw-bib-types"><option>Mix of primary and secondary sources</option><option>Primary sources only</option><option>Secondary sources only</option><option>Digital / online archives</option><option>Include historiographical works</option></select></div>
+      <input type="hidden" id="rw-cite-style" value="Chicago" />
+      <button class="rw-btn" onclick="rwGenerate('bibliography')">📚 Generate Bibliography</button>
+      <div style="font-size:0.62rem;color:var(--muted);font-style:italic;margin-top:-6px">Note: Representative scholarly works — always verify independently.</div>
+      <div class="rw-output" id="rwo-bibliography"></div>
+      <div class="rw-output-actions" id="rwoa-bibliography"><button class="rw-out-btn" onclick="rwCopy('rwo-bibliography')">Copy</button><button class="rw-out-btn" onclick="rwExportTxt('rwo-bibliography','bibliography')">Download .txt</button></div>
+    </div>
+    <!-- SOURCE ANALYSIS -->
+    <div class="rw-panel" id="rwp-source">
+      <div><div class="rw-label">Paste Primary Source Excerpt or Describe the Source</div><textarea class="rw-input" id="rw-source-text" placeholder="Paste a historical document, speech, letter, inscription…" rows="4"></textarea></div>
+      <div><div class="rw-label">Analysis Focus</div><select class="rw-select" id="rw-source-focus"><option>Full HAPP analysis (Historical context, Audience, Purpose, Provenance)</option><option>Author's bias and perspective</option><option>Reliability and limitations</option><option>Cross-reference with secondary sources</option><option>Linguistic / rhetorical analysis</option><option>What it reveals about its era</option></select></div>
+      <button class="rw-btn" onclick="rwGenerate('source')">🔍 Analyse Source</button>
+      <div class="rw-output" id="rwo-source"></div>
+      <div class="rw-output-actions" id="rwoa-source"><button class="rw-out-btn" onclick="rwCopy('rwo-source')">Copy</button><button class="rw-out-btn" onclick="rwSendToChat('rwo-source')">Discuss further →</button></div>
+    </div>
+    <!-- HISTORIOGRAPHY -->
+    <div class="rw-panel" id="rwp-historiography">
+      <div><div class="rw-label">Historical Topic or Event</div><textarea class="rw-input" id="rw-histo-topic" placeholder="e.g. The causes of the French Revolution" rows="2"></textarea></div>
+      <div><div class="rw-label">What to Cover</div><select class="rw-select" id="rw-histo-scope"><option>Full historiographical overview (major schools of thought)</option><option>Marxist vs liberal interpretations</option><option>Revisionist and post-revisionist debates</option><option>Impact of social / cultural history approaches</option><option>Key historians and their arguments</option><option>How interpretations have evolved over time</option></select></div>
+      <button class="rw-btn" onclick="rwGenerate('historiography')">🏛 Write Historiographical Essay</button>
+      <div class="rw-output" id="rwo-historiography"></div>
+      <div class="rw-output-actions" id="rwoa-historiography"><button class="rw-out-btn" onclick="rwCopy('rwo-historiography')">Copy</button><button class="rw-out-btn" onclick="rwExportTxt('rwo-historiography','historiography')">Download</button><button class="rw-out-btn" onclick="rwSendToChat('rwo-historiography')">Continue in Chat →</button></div>
+    </div>
+    <!-- ABSTRACT -->
+    <div class="rw-panel" id="rwp-abstract">
+      <div><div class="rw-label">Paste Your Paper / Essay Text (or describe its argument)</div><textarea class="rw-input" id="rw-abstract-text" placeholder="Paste your paper text, or describe your thesis, arguments, evidence, and conclusions…" rows="5"></textarea></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div><div class="rw-label">Abstract Length</div><select class="rw-select" id="rw-abstract-len"><option>Short (100–150 words)</option><option>Standard (150–250 words)</option><option>Extended (250–350 words)</option></select></div>
+        <div><div class="rw-label">Journal / Style</div><select class="rw-select" id="rw-abstract-style"><option>General academic history</option><option>American Historical Review style</option><option>Journal of Modern History style</option><option>Social history focus</option><option>Military / political history focus</option></select></div>
+      </div>
+      <button class="rw-btn" onclick="rwGenerate('abstract')">📄 Write Abstract</button>
+      <div class="rw-output" id="rwo-abstract"></div>
+      <div class="rw-output-actions" id="rwoa-abstract"><button class="rw-out-btn" onclick="rwCopy('rwo-abstract')">Copy</button><button class="rw-out-btn" onclick="rwGenerate('abstract')">Regenerate</button></div>
+    </div>
+    <!-- ARGUMENTS -->
+    <div class="rw-panel" id="rwp-argument">
+      <div><div class="rw-label">Historical Claim or Thesis</div><textarea class="rw-input" id="rw-arg-claim" placeholder="e.g. The Treaty of Versailles was the primary cause of World War II" rows="2"></textarea></div>
+      <div><div class="rw-label">What to Generate</div><select class="rw-select" id="rw-arg-type"><option>3 supporting arguments with evidence</option><option>3 counterarguments and rebuttals</option><option>Full pro/con debate with evidence on both sides</option><option>Revisionist challenge to mainstream view</option><option>Historiographical debate summary</option></select></div>
+      <button class="rw-btn" onclick="rwGenerate('argument')">⚔️ Generate Arguments</button>
+      <div class="rw-output" id="rwo-argument"></div>
+      <div class="rw-output-actions" id="rwoa-argument"><button class="rw-out-btn" onclick="rwCopy('rwo-argument')">Copy</button><button class="rw-out-btn" onclick="rwSendToChat('rwo-argument')">Debate in Chat →</button></div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: CHRONOLOGY BUILDER -->
+<div class="modal-overlay" id="modal-chrono">
+  <div class="modal" style="max-width:580px">
+    <button class="modal-close" onclick="closeModal('modal-chrono')">✕</button>
+    <h3>⏳ CHRONOLOGY BUILDER</h3>
+    <p style="font-size:0.75rem;color:var(--muted2);margin-bottom:14px;font-style:italic">Enter key events and Chronicler will produce a scholarly annotated timeline.</p>
+    <div class="rw-label">Events (year + description)</div>
+    <div class="chrono-events" id="chrono-events">
+      <div class="chrono-event-row"><input class="chrono-year-input" placeholder="Year / BCE" /><input class="chrono-event-input" placeholder="Event description…" /><button class="chrono-del" onclick="chronoDel(this)">✕</button></div>
+      <div class="chrono-event-row"><input class="chrono-year-input" placeholder="Year / BCE" /><input class="chrono-event-input" placeholder="Event description…" /><button class="chrono-del" onclick="chronoDel(this)">✕</button></div>
+    </div>
+    <button class="chrono-add" onclick="chronoAdd()">+ Add Event</button>
+    <div style="margin-top:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <select class="rw-select" id="chrono-focus" style="flex:1;min-width:160px"><option>Annotate with historical significance</option><option>Focus on causes and effects</option><option>Political history focus</option><option>Social and cultural context</option><option>Military history focus</option><option>Economic history focus</option></select>
+      <button class="rw-btn" style="margin:0" onclick="buildChronology()">⏳ Build Chronology</button>
+    </div>
+    <div class="rw-output" id="rwo-chrono" style="margin-top:12px"></div>
+    <div class="rw-output-actions" id="rwoa-chrono" style="margin-top:6px"><button class="rw-out-btn" onclick="rwCopy('rwo-chrono')">Copy</button><button class="rw-out-btn" onclick="rwExportTxt('rwo-chrono','chronology')">Download</button><button class="rw-out-btn" onclick="rwSendToChat('rwo-chrono')">Send to Chat →</button></div>
+  </div>
+</div>
+
+<!-- MODAL: DOCUMENT TRANSLATOR -->
+<div class="modal-overlay" id="modal-doctrans">
+  <div class="modal" style="max-width:600px">
+    <button class="modal-close" onclick="closeModal('modal-doctrans')">✕</button>
+    <h3>📜 HISTORICAL DOCUMENT TRANSLATOR</h3>
+    <p style="font-size:0.75rem;color:var(--muted2);margin-bottom:14px;font-style:italic">Translate Latin, Old English, Middle English, or any historical language with scholarly annotation.</p>
+    <div class="doc-trans-wrap">
+      <div><div class="rw-label">Paste Historical Text</div><textarea class="rw-input" id="dt-source" placeholder="Paste Latin, Old English, Middle English, Classical Arabic, Ancient Greek…" rows="5"></textarea></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div><div class="rw-label">Source Language / Period</div><select class="rw-select" id="dt-lang"><option>Auto-detect</option><option>Classical Latin</option><option>Medieval Latin</option><option>Old English (Anglo-Saxon)</option><option>Middle English</option><option>Early Modern English (Shakespeare era)</option><option>Old French / Anglo-Norman</option><option>Classical Arabic</option><option>Ancient Greek</option><option>Church Slavonic</option><option>Ottoman Turkish</option></select></div>
+        <div><div class="rw-label">Output Type</div><select class="rw-select" id="dt-output"><option>Modern translation + annotations</option><option>Literal translation only</option><option>Translation + historical context</option><option>Paraphrase in plain English</option><option>Scholarly critical edition style</option></select></div>
+      </div>
+      <button class="rw-btn" onclick="translateDocument()">📜 Translate & Annotate</button>
+      <div class="rw-output" id="rwo-doctrans"></div>
+      <div class="rw-output-actions" id="rwoa-doctrans"><button class="rw-out-btn" onclick="rwCopy('rwo-doctrans')">Copy</button><button class="rw-out-btn" onclick="rwSendToChat('rwo-doctrans')">Discuss in Chat →</button><button class="rw-out-btn" onclick="rwExportTxt('rwo-doctrans','translation')">Download</button></div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: MAP -->
+<div class="modal-overlay" id="modal-map">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('modal-map')">✕</button>
+    <h3>🗺️ EXPLORE BY REGION</h3>
+    <p style="font-size:0.75rem;color:var(--muted2);margin-bottom:14px;font-style:italic">Dive into the history of a specific region of the world.</p>
+    <div class="map-grid">
+      <div class="map-region" onclick="closeModal('modal-map');askTopic('Give me a rich overview of the history of Europe, from ancient Greece and Rome through the Middle Ages, Renaissance, and modern era')"><div class="region-name">🏰 Europe</div><div class="region-desc">Greece, Rome, Medieval kingdoms, Renaissance, modern conflicts</div></div>
+      <div class="map-region" onclick="closeModal('modal-map');askTopic('Explore the history of the Middle East and Mesopotamia — cradle of civilization, Islamic Golden Age, Ottoman Empire')"><div class="region-name">🕌 Middle East</div><div class="region-desc">Mesopotamia, Persia, Islamic Caliphates, Crusades, Ottoman era</div></div>
+      <div class="map-region" onclick="closeModal('modal-map');askTopic('Give me a sweeping history of East Asia — China, Japan, Korea from ancient dynasties to the modern era')"><div class="region-name">🏯 East Asia</div><div class="region-desc">Chinese dynasties, Feudal Japan, Silk Road trade, 20th century</div></div>
+      <div class="map-region" onclick="closeModal('modal-map');askTopic('Tell me about African history — ancient Egypt, Mali and Songhai empires, the Bantu migrations, colonial era')"><div class="region-name">🌍 Africa</div><div class="region-desc">Ancient Egypt, Mali Empire, trade routes, colonialism</div></div>
+      <div class="map-region" onclick="closeModal('modal-map');askTopic('Explore the history of the Americas — Maya, Aztec, Inca, colonial period, American Revolution, Latin America')"><div class="region-name">🌎 The Americas</div><div class="region-desc">Maya, Aztec, Inca, colonization, independence movements</div></div>
+      <div class="map-region" onclick="closeModal('modal-map');askTopic('Tell me about South and Southeast Asian history — Indus Valley, Maurya, Mughal Empire, British Raj')"><div class="region-name">🛕 South & SE Asia</div><div class="region-desc">Indus Valley, Maurya, Mughal Empire, Colonial era</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── API KEY MODAL ── -->
+<div class="modal-overlay" id="modal-apikey" style="z-index:500">
+  <div class="modal" style="max-width:560px;max-height:88vh">
+
+    <!-- STEP 1: Choose provider -->
+    <div id="akey-step1">
+      <div style="text-align:center;margin-bottom:18px">
+        <div style="font-size:2.2rem;margin-bottom:8px">&#128273;</div>
+        <h3 style="margin-bottom:5px">Connect an AI Provider</h3>
+        <p style="font-size:0.75rem;color:var(--muted2);font-style:italic;line-height:1.6">Chronicler works with three AI providers. Choose one below.<br>All are free to start &mdash; no credit card required for Groq.</p>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px">
+        <div onclick="akeySelectProvider('groq')" style="display:flex;align-items:center;gap:14px;padding:13px 15px;background:var(--surface2);border:1px solid var(--border2);border-radius:10px;cursor:pointer;transition:border-color 0.2s" onmouseover="this.style.borderColor='var(--gold)'" onmouseout="this.style.borderColor='var(--border2)'">
+          <div style="font-size:1.5rem;flex-shrink:0">&#9889;</div>
+          <div style="flex:1">
+            <div style="font-family:Cinzel,serif;font-size:0.78rem;color:var(--gold2);margin-bottom:3px">Groq &nbsp;<span style="font-family:Space Mono,monospace;font-size:0.48rem;color:var(--green);border:1px solid var(--green);border-radius:100px;padding:1px 6px">FREE &middot; NO CARD</span></div>
+            <div style="font-size:0.72rem;color:var(--parchment-dim);line-height:1.4">Runs Llama 3.3 70B. Fastest option, completely free, no credit card ever. Best for most users.</div>
+          </div>
+          <div style="color:var(--muted);font-size:0.9rem">&rarr;</div>
+        </div>
+        <div onclick="akeySelectProvider('gemini')" style="display:flex;align-items:center;gap:14px;padding:13px 15px;background:var(--surface2);border:1px solid var(--border2);border-radius:10px;cursor:pointer;transition:border-color 0.2s" onmouseover="this.style.borderColor='var(--gold)'" onmouseout="this.style.borderColor='var(--border2)'">
+          <div style="font-size:1.5rem;flex-shrink:0">&#11088;</div>
+          <div style="flex:1">
+            <div style="font-family:Cinzel,serif;font-size:0.78rem;color:var(--gold2);margin-bottom:3px">Google Gemini &nbsp;<span style="font-family:Space Mono,monospace;font-size:0.48rem;color:var(--blue);border:1px solid var(--blue);border-radius:100px;padding:1px 6px">FREE TIER</span></div>
+            <div style="font-size:0.72rem;color:var(--parchment-dim);line-height:1.4">Google AI Studio gives free access to Gemini 2.0 Flash. Free tier may be limited in some regions.</div>
+          </div>
+          <div style="color:var(--muted);font-size:0.9rem">&rarr;</div>
+        </div>
+        <div onclick="akeySelectProvider('openai')" style="display:flex;align-items:center;gap:14px;padding:13px 15px;background:var(--surface2);border:1px solid var(--border2);border-radius:10px;cursor:pointer;transition:border-color 0.2s" onmouseover="this.style.borderColor='var(--gold)'" onmouseout="this.style.borderColor='var(--border2)'">
+          <div style="font-size:1.5rem;flex-shrink:0">&#129302;</div>
+          <div style="flex:1">
+            <div style="font-family:Cinzel,serif;font-size:0.78rem;color:var(--gold2);margin-bottom:3px">OpenAI ChatGPT &nbsp;<span style="font-family:Space Mono,monospace;font-size:0.48rem;color:var(--parchment-dim);border:1px solid var(--muted);border-radius:100px;padding:1px 6px">PAID &middot; $5 MIN</span></div>
+            <div style="font-size:0.72rem;color:var(--parchment-dim);line-height:1.4">Uses GPT-4o. Highest quality responses. Requires a paid OpenAI account with at least $5 credit.</div>
+          </div>
+          <div style="color:var(--muted);font-size:0.9rem">&rarr;</div>
+        </div>
+      </div>
+      <div style="background:rgba(200,146,58,0.06);border:1px solid rgba(200,146,58,0.15);border-radius:8px;padding:10px 13px">
+        <div style="font-size:0.68rem;color:var(--muted2);line-height:1.6">&#128274; Whichever you choose, your API key is saved <strong style="color:var(--parchment-dim)">only in your own browser</strong> and is never stored on any server.</div>
+      </div>
+    </div>
+
+    <!-- STEP 2: Tutorial -->
+    <div id="akey-step2" style="display:none">
+      <button onclick="akeyBack()" style="background:none;border:none;color:var(--muted2);font-family:Space Mono,monospace;font-size:0.5rem;cursor:pointer;margin-bottom:12px;letter-spacing:0.08em;padding:0">&larr; BACK TO PROVIDERS</button>
+
+      <!-- Groq tutorial -->
+      <div id="akey-tutorial-groq">
+        <h3 style="margin-bottom:3px">&#9889; Get Your Free Groq API Key</h3>
+        <p style="font-size:0.7rem;color:var(--muted2);font-style:italic;margin-bottom:12px">Takes about 2 minutes. No credit card required.</p>
+        <div style="display:flex;flex-direction:column;gap:7px;margin-bottom:12px">
+          <div style="display:flex;gap:10px;align-items:flex-start;padding:9px 11px;background:var(--surface2);border:1px solid var(--border);border-radius:8px"><div style="width:20px;height:20px;border-radius:50%;background:var(--gold-dim);border:1px solid var(--gold);display:flex;align-items:center;justify-content:center;font-family:Cinzel,serif;font-size:0.6rem;color:var(--gold2);flex-shrink:0">1</div><div><div style="font-family:Space Mono,monospace;font-size:0.5rem;color:var(--gold2);margin-bottom:2px">OPEN GROQ CONSOLE</div><div style="font-size:0.72rem;color:var(--parchment-dim);line-height:1.45">Go to <a href="https://console.groq.com" target="_blank" style="color:var(--gold)">console.groq.com</a> &rarr; click <strong style="color:var(--parchment)">"Sign Up"</strong> (Google login works).</div></div></div>
+          <div style="display:flex;gap:10px;align-items:flex-start;padding:9px 11px;background:var(--surface2);border:1px solid var(--border);border-radius:8px"><div style="width:20px;height:20px;border-radius:50%;background:var(--gold-dim);border:1px solid var(--gold);display:flex;align-items:center;justify-content:center;font-family:Cinzel,serif;font-size:0.6rem;color:var(--gold2);flex-shrink:0">2</div><div><div style="font-family:Space Mono,monospace;font-size:0.5rem;color:var(--gold2);margin-bottom:2px">API KEYS SIDEBAR</div><div style="font-size:0.72rem;color:var(--parchment-dim);line-height:1.45">Click <strong style="color:var(--parchment)">"API Keys"</strong> in the left sidebar.</div></div></div>
+          <div style="display:flex;gap:10px;align-items:flex-start;padding:9px 11px;background:var(--surface2);border:1px solid var(--border);border-radius:8px"><div style="width:20px;height:20px;border-radius:50%;background:var(--gold-dim);border:1px solid var(--gold);display:flex;align-items:center;justify-content:center;font-family:Cinzel,serif;font-size:0.6rem;color:var(--gold2);flex-shrink:0">3</div><div><div style="font-family:Space Mono,monospace;font-size:0.5rem;color:var(--gold2);margin-bottom:2px">CREATE &amp; COPY</div><div style="font-size:0.72rem;color:var(--parchment-dim);line-height:1.45">Click <strong style="color:var(--parchment)">"Create API Key"</strong>, name it anything, click Submit. Copy the key starting with <strong style="color:var(--parchment)">gsk_</strong> &mdash; you only see it once!</div></div></div>
+        </div>
+        <button onclick="akeyShowEnter()" style="width:100%;padding:10px;background:linear-gradient(135deg,var(--gold),#8b5e1a);border:none;border-radius:9px;font-family:Cinzel,serif;font-size:0.66rem;letter-spacing:0.1em;color:var(--bg);cursor:pointer;">I Have My Key &rarr;</button>
+      </div>
+
+      <!-- Gemini tutorial -->
+      <div id="akey-tutorial-gemini" style="display:none">
+        <h3 style="margin-bottom:3px">&#11088; Get Your Gemini API Key</h3>
+        <p style="font-size:0.7rem;color:var(--muted2);font-style:italic;margin-bottom:12px">Via Google AI Studio. Free tier available in most countries.</p>
+        <div style="display:flex;flex-direction:column;gap:7px;margin-bottom:10px">
+          <div style="display:flex;gap:10px;align-items:flex-start;padding:9px 11px;background:var(--surface2);border:1px solid var(--border);border-radius:8px"><div style="width:20px;height:20px;border-radius:50%;background:var(--gold-dim);border:1px solid var(--gold);display:flex;align-items:center;justify-content:center;font-family:Cinzel,serif;font-size:0.6rem;color:var(--gold2);flex-shrink:0">1</div><div><div style="font-family:Space Mono,monospace;font-size:0.5rem;color:var(--gold2);margin-bottom:2px">OPEN GOOGLE AI STUDIO</div><div style="font-size:0.72rem;color:var(--parchment-dim);line-height:1.45">Go to <a href="https://aistudio.google.com" target="_blank" style="color:var(--gold)">aistudio.google.com</a> and sign in with Google.</div></div></div>
+          <div style="display:flex;gap:10px;align-items:flex-start;padding:9px 11px;background:var(--surface2);border:1px solid var(--border);border-radius:8px"><div style="width:20px;height:20px;border-radius:50%;background:var(--gold-dim);border:1px solid var(--gold);display:flex;align-items:center;justify-content:center;font-family:Cinzel,serif;font-size:0.6rem;color:var(--gold2);flex-shrink:0">2</div><div><div style="font-family:Space Mono,monospace;font-size:0.5rem;color:var(--gold2);margin-bottom:2px">GET API KEY</div><div style="font-size:0.72rem;color:var(--parchment-dim);line-height:1.45">Click <strong style="color:var(--parchment)">"Get API Key"</strong> in the sidebar &rarr; <strong style="color:var(--parchment)">"Create API key"</strong> &rarr; select or create a project.</div></div></div>
+          <div style="display:flex;gap:10px;align-items:flex-start;padding:9px 11px;background:var(--surface2);border:1px solid var(--border);border-radius:8px"><div style="width:20px;height:20px;border-radius:50%;background:var(--gold-dim);border:1px solid var(--gold);display:flex;align-items:center;justify-content:center;font-family:Cinzel,serif;font-size:0.6rem;color:var(--gold2);flex-shrink:0">3</div><div><div style="font-family:Space Mono,monospace;font-size:0.5rem;color:var(--gold2);margin-bottom:2px">COPY YOUR KEY</div><div style="font-size:0.72rem;color:var(--parchment-dim);line-height:1.45">Copy the key &mdash; it starts with <strong style="color:var(--parchment)">AIza</strong>.</div></div></div>
+        </div>
+        <div style="background:rgba(139,32,32,0.1);border:1px solid rgba(196,64,64,0.25);border-radius:7px;padding:8px 11px;margin-bottom:10px;font-size:0.67rem;color:var(--crimson-light);line-height:1.5">&#9888; Google restricts free Gemini API access in some regions. If you get a quota error, switch to Groq instead.</div>
+        <button onclick="akeyShowEnter()" style="width:100%;padding:10px;background:linear-gradient(135deg,var(--gold),#8b5e1a);border:none;border-radius:9px;font-family:Cinzel,serif;font-size:0.66rem;letter-spacing:0.1em;color:var(--bg);cursor:pointer;">I Have My Key &rarr;</button>
+      </div>
+
+      <!-- OpenAI tutorial -->
+      <div id="akey-tutorial-openai" style="display:none">
+        <h3 style="margin-bottom:3px">&#129302; Get an OpenAI API Key</h3>
+        <p style="font-size:0.7rem;color:var(--muted2);font-style:italic;margin-bottom:12px">Requires a paid account. Minimum $5 credit to get started.</p>
+        <div style="display:flex;flex-direction:column;gap:7px;margin-bottom:10px">
+          <div style="display:flex;gap:10px;align-items:flex-start;padding:9px 11px;background:var(--surface2);border:1px solid var(--border);border-radius:8px"><div style="width:20px;height:20px;border-radius:50%;background:var(--gold-dim);border:1px solid var(--gold);display:flex;align-items:center;justify-content:center;font-family:Cinzel,serif;font-size:0.6rem;color:var(--gold2);flex-shrink:0">1</div><div><div style="font-family:Space Mono,monospace;font-size:0.5rem;color:var(--gold2);margin-bottom:2px">CREATE OPENAI ACCOUNT</div><div style="font-size:0.72rem;color:var(--parchment-dim);line-height:1.45">Go to <a href="https://platform.openai.com" target="_blank" style="color:var(--gold)">platform.openai.com</a> and sign up or log in.</div></div></div>
+          <div style="display:flex;gap:10px;align-items:flex-start;padding:9px 11px;background:var(--surface2);border:1px solid var(--border);border-radius:8px"><div style="width:20px;height:20px;border-radius:50%;background:var(--gold-dim);border:1px solid var(--gold);display:flex;align-items:center;justify-content:center;font-family:Cinzel,serif;font-size:0.6rem;color:var(--gold2);flex-shrink:0">2</div><div><div style="font-family:Space Mono,monospace;font-size:0.5rem;color:var(--gold2);margin-bottom:2px">ADD BILLING CREDIT</div><div style="font-size:0.72rem;color:var(--parchment-dim);line-height:1.45">Go to <strong style="color:var(--parchment)">Settings &rarr; Billing</strong>, add a card, and load at least <strong style="color:var(--parchment)">$5</strong> in credits.</div></div></div>
+          <div style="display:flex;gap:10px;align-items:flex-start;padding:9px 11px;background:var(--surface2);border:1px solid var(--border);border-radius:8px"><div style="width:20px;height:20px;border-radius:50%;background:var(--gold-dim);border:1px solid var(--gold);display:flex;align-items:center;justify-content:center;font-family:Cinzel,serif;font-size:0.6rem;color:var(--gold2);flex-shrink:0">3</div><div><div style="font-family:Space Mono,monospace;font-size:0.5rem;color:var(--gold2);margin-bottom:2px">CREATE API KEY</div><div style="font-size:0.72rem;color:var(--parchment-dim);line-height:1.45">Click <strong style="color:var(--parchment)">"API Keys"</strong> in the sidebar &rarr; <strong style="color:var(--parchment)">"Create new secret key"</strong>. Copy it immediately &mdash; starts with <strong style="color:var(--parchment)">sk-</strong>.</div></div></div>
+        </div>
+        <div style="background:rgba(200,146,58,0.06);border:1px solid rgba(200,146,58,0.15);border-radius:7px;padding:8px 11px;margin-bottom:10px;font-size:0.67rem;color:var(--muted2);line-height:1.5">&#128161; GPT-4o costs ~$0.01&ndash;$0.03 per conversation. Your $5 gives you hundreds of history conversations.</div>
+        <button onclick="akeyShowEnter()" style="width:100%;padding:10px;background:linear-gradient(135deg,var(--gold),#8b5e1a);border:none;border-radius:9px;font-family:Cinzel,serif;font-size:0.66rem;letter-spacing:0.1em;color:var(--bg);cursor:pointer;">I Have My Key &rarr;</button>
+      </div>
+    </div>
+
+    <!-- STEP 3: Enter key -->
+    <div id="akey-step3" style="display:none">
+      <button onclick="akeyBack2Tutorial()" style="background:none;border:none;color:var(--muted2);font-family:Space Mono,monospace;font-size:0.5rem;cursor:pointer;margin-bottom:12px;letter-spacing:0.08em;padding:0">&larr; BACK TO TUTORIAL</button>
+      <h3 style="margin-bottom:4px" id="akey-step3-title">&#128273; Enter Your API Key</h3>
+      <p style="font-size:0.73rem;color:var(--muted2);font-style:italic;margin-bottom:13px">Saved in your browser only &mdash; never shared with anyone.</p>
+      <div style="margin-bottom:10px">
+        <div style="font-family:Space Mono,monospace;font-size:0.5rem;color:var(--muted);letter-spacing:0.13em;text-transform:uppercase;margin-bottom:5px" id="akey-input-label">API Key</div>
+        <input id="akey-input" type="password" placeholder="Paste your key here…"
+          style="width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:10px 13px;color:var(--parchment);font-family:Space Mono,monospace;font-size:0.7rem;outline:none;transition:border-color 0.2s;"
+          oninput="this.style.borderColor='rgba(200,146,58,0.5)'"
+          onkeydown="if(event.key==='Enter')akeySubmit()" />
+      </div>
+      <div style="display:flex;gap:5px;margin-bottom:11px;flex-wrap:wrap">
+        <button onclick="akeyToggleShow()" id="akey-show-btn" style="padding:4px 10px;background:var(--surface);border:1px solid var(--border);border-radius:6px;font-family:Space Mono,monospace;font-size:0.48rem;color:var(--muted2);cursor:pointer">&#128065; Show Key</button>
+        <button onclick="akeyBack()" style="padding:4px 10px;background:var(--surface);border:1px solid var(--border);border-radius:6px;font-family:Space Mono,monospace;font-size:0.48rem;color:var(--muted2);cursor:pointer">&#8617; Change Provider</button>
+      </div>
+      <div id="akey-error" style="display:none;padding:8px 12px;background:rgba(139,32,32,0.12);border:1px solid rgba(196,64,64,0.3);border-radius:7px;font-size:0.7rem;color:var(--crimson-light);margin-bottom:10px"></div>
+      <button onclick="akeySubmit()" style="width:100%;padding:11px;background:linear-gradient(135deg,var(--gold),#8b5e1a);border:none;border-radius:9px;font-family:Cinzel,serif;font-size:0.7rem;letter-spacing:0.1em;color:var(--bg);cursor:pointer;">&#10003; Save Key &amp; Start Chronicler</button>
+    </div>
+
+  </div>
+</div>
+
+<!-- ── KEY SETTINGS BUTTON (shown in topbar after key is set) ── -->
+<div id="key-set-indicator" style="display:none"></div>
+
+<div class="shell">
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <div class="logo"><div class="logo-icon">📜</div><div class="logo-name">CHRONICLER</div></div>
+      <div class="logo-tagline">Your AI Historian</div>
+    </div>
+    <div class="sidebar-tabs">
+      <div class="stab active" onclick="switchTab('explore',this)">Explore</div>
+      <div class="stab" onclick="switchTab('figures',this)">Figures</div>
+      <div class="stab" onclick="switchTab('saved',this)">Saved</div>
+      <div class="stab" onclick="switchTab('research',this)">Research</div>
+    </div>
+    <!-- EXPLORE TAB -->
+    <div class="sidebar-panel active" id="tab-explore">
+      <div class="section-pad" style="border-bottom:1px solid var(--border)">
+        <div class="section-label">Browse by Era</div>
+        <div class="era-grid">
+          <button class="era-btn" onclick="setEra('Ancient World',this)"><span class="era-icon">🏛️</span>Ancient</button>
+          <button class="era-btn" onclick="setEra('Medieval Period',this)"><span class="era-icon">⚔️</span>Medieval</button>
+          <button class="era-btn" onclick="setEra('Renaissance',this)"><span class="era-icon">🎨</span>Renaissance</button>
+          <button class="era-btn" onclick="setEra('Age of Exploration',this)"><span class="era-icon">⛵</span>Exploration</button>
+          <button class="era-btn" onclick="setEra('Modern Era',this)"><span class="era-icon">🏭</span>Modern</button>
+          <button class="era-btn" onclick="setEra('All of Human History',this)"><span class="era-icon">🌍</span>All Eras</button>
+        </div>
+      </div>
+      <div class="section-pad" style="border-bottom:1px solid var(--border);flex:1;overflow-y:auto;padding-bottom:6px">
+        <div class="section-label">Quick Topics</div>
+        <div class="topic-chip" onclick="askTopic('Tell me about the fall of the Roman Empire and its lasting legacy')"><span class="tc-icon">🏛️</span>Fall of Rome</div>
+        <div class="topic-chip" onclick="askTopic('Explain the causes and consequences of World War I')"><span class="tc-icon">💥</span>WWI Causes</div>
+        <div class="topic-chip" onclick="askTopic('What was the Black Death and how did it reshape Europe?')"><span class="tc-icon">☠️</span>The Black Death</div>
+        <div class="topic-chip" onclick="askTopic('Tell me about the Silk Road and its role in ancient trade')"><span class="tc-icon">🐪</span>The Silk Road</div>
+        <div class="topic-chip" onclick="askTopic('How did the French Revolution begin and what were its phases?')"><span class="tc-icon">🗡️</span>French Revolution</div>
+        <div class="topic-chip" onclick="askTopic('What were the greatest empires in history and why did they fall?')"><span class="tc-icon">👑</span>Great Empires</div>
+        <div class="topic-chip" onclick="askTopic('Explain the rise and fall of the Mongol Empire')"><span class="tc-icon">🏹</span>Mongol Empire</div>
+        <div class="topic-chip" onclick="askTopic('What was the significance of the Renaissance?')"><span class="tc-icon">🎨</span>The Renaissance</div>
+        <div class="topic-chip" onclick="askTopic('Describe ancient Egyptian civilization and its achievements')"><span class="tc-icon">🔺</span>Ancient Egypt</div>
+        <div class="topic-chip" onclick="askTopic('What caused the Cold War and how did it shape global politics?')"><span class="tc-icon">☢️</span>The Cold War</div>
+      </div>
+      <div class="otd-section">
+        <div class="otd-card">
+          <div class="otd-label">📅 On This Day</div>
+          <div class="otd-text" id="otd-text">Consulting the archives…</div>
+          <span class="otd-ask" id="otd-ask" style="display:none" onclick="askOTD()">→ Tell me more</span>
+        </div>
+      </div>
+    </div>
+    <!-- FIGURES TAB -->
+    <div class="sidebar-panel" id="tab-figures" style="padding:10px 0;gap:6px">
+      <div style="padding:0 14px 4px"><div class="section-label">Notable Figures</div></div>
+      <div class="figure-card" onclick="askTopic('Give me a detailed biography and historical assessment of Julius Caesar — his rise, achievements, assassination, and legacy')"><div class="figure-name">Julius Caesar</div><div class="figure-dates">100 – 44 BCE · Roman</div><div class="figure-desc">General, statesman, the man who ended the Republic</div></div>
+      <div class="figure-card" onclick="askTopic('Tell me about Cleopatra VII — her life, her political genius, her relationships with Caesar and Antony, and her legacy')"><div class="figure-name">Cleopatra VII</div><div class="figure-dates">69 – 30 BCE · Egyptian</div><div class="figure-desc">Last pharaoh of Egypt, master diplomat and linguist</div></div>
+      <div class="figure-card" onclick="askTopic('Who was Genghis Khan? Tell me about his rise to conqueror of the largest land empire in history')"><div class="figure-name">Genghis Khan</div><div class="figure-dates">1162 – 1227 · Mongol</div><div class="figure-desc">Founded the largest contiguous empire in history</div></div>
+      <div class="figure-card" onclick="askTopic('Analyze Napoleon Bonaparte — his military genius, his reforms, his rise and fall, and his lasting impact on Europe')"><div class="figure-name">Napoleon Bonaparte</div><div class="figure-dates">1769 – 1821 · French</div><div class="figure-desc">Military genius who reshaped the map of Europe</div></div>
+      <div class="figure-card" onclick="askTopic('Tell me about Alexander the Great — his conquests, his relationship with Aristotle, and the Hellenistic world he created')"><div class="figure-name">Alexander the Great</div><div class="figure-dates">356 – 323 BCE · Greek</div><div class="figure-desc">Conquered from Greece to India before age 33</div></div>
+      <div class="figure-card" onclick="askTopic('Explain Queen Elizabeth I — her reign, the Spanish Armada, and her political skill as a woman ruler')"><div class="figure-name">Elizabeth I</div><div class="figure-dates">1533 – 1603 · English</div><div class="figure-desc">The Virgin Queen who guided England's golden age</div></div>
+      <div class="figure-card" onclick="askTopic('Tell me about Suleiman the Magnificent and the Ottoman Empire at its height')"><div class="figure-name">Suleiman the Magnificent</div><div class="figure-dates">1494 – 1566 · Ottoman</div><div class="figure-desc">Ottoman sultan who brought the empire to its zenith</div></div>
+      <div class="figure-card" onclick="askTopic('Who was Harriet Tubman and what was her full role in the Underground Railroad and Civil War?')"><div class="figure-name">Harriet Tubman</div><div class="figure-dates">1822 – 1913 · American</div><div class="figure-desc">Abolitionist, spy, and freedom fighter</div></div>
+    </div>
+    <!-- SAVED TAB -->
+    <div class="sidebar-panel" id="tab-saved">
+      <div class="saved-list" id="saved-list">
+        <div class="saved-empty" id="saved-empty">No saved responses yet.<br><br>Click <strong style="color:var(--gold)">Save</strong> on any answer to bookmark it here.</div>
+      </div>
+    </div>
+    <!-- RESEARCH TAB -->
+    <div class="sidebar-panel" id="tab-research">
+      <div class="research-quick">
+        <div class="rw-label" style="padding:2px 0 6px">Research Tools</div>
+        <div class="rq-btn" onclick="rwTabByName('thesis')"><span class="rq-icon">📌</span><div class="rq-info"><div class="rq-title">Thesis Builder</div><div class="rq-sub">CRAFT YOUR ARGUMENT</div></div></div>
+        <div class="rq-btn" onclick="rwTabByName('outline')"><span class="rq-icon">📋</span><div class="rq-info"><div class="rq-title">Paper Outline</div><div class="rq-sub">STRUCTURE YOUR ESSAY</div></div></div>
+        <div class="rq-btn" onclick="rwTabByName('bibliography')"><span class="rq-icon">📚</span><div class="rq-info"><div class="rq-title">Bibliography Generator</div><div class="rq-sub">CHICAGO · MLA · APA · OXFORD</div></div></div>
+        <div class="rq-btn" onclick="rwTabByName('source')"><span class="rq-icon">🔍</span><div class="rq-info"><div class="rq-title">Source Analysis</div><div class="rq-sub">HAPP · BIAS · RELIABILITY</div></div></div>
+        <div class="rq-btn" onclick="rwTabByName('historiography')"><span class="rq-icon">🏛</span><div class="rq-info"><div class="rq-title">Historiographical Essay</div><div class="rq-sub">SCHOOLS OF THOUGHT</div></div></div>
+        <div class="rq-btn" onclick="rwTabByName('abstract')"><span class="rq-icon">📄</span><div class="rq-info"><div class="rq-title">Abstract Writer</div><div class="rq-sub">JOURNAL-READY ABSTRACTS</div></div></div>
+        <div class="rq-btn" onclick="rwTabByName('argument')"><span class="rq-icon">⚔️</span><div class="rq-info"><div class="rq-title">Arguments & Rebuttals</div><div class="rq-sub">PRO / CON · DEBATE</div></div></div>
+        <div class="rq-btn" onclick="openModal('modal-chrono')"><span class="rq-icon">⏳</span><div class="rq-info"><div class="rq-title">Chronology Builder</div><div class="rq-sub">ANNOTATED TIMELINE</div></div></div>
+        <div class="rq-btn" onclick="openModal('modal-doctrans')"><span class="rq-icon">🗒️</span><div class="rq-info"><div class="rq-title">Document Translator</div><div class="rq-sub">LATIN · OLD ENGLISH · MORE</div></div></div>
+        <div class="rq-btn" onclick="setMode('professor',document.querySelectorAll('.mode-pill')[4]);showToast('Professor Mode activated')"><span class="rq-icon">🎓</span><div class="rq-info"><div class="rq-title">Professor Mode</div><div class="rq-sub">STRUCTURED LECTURES</div></div></div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <div class="main">
+    <div class="topbar">
+      <div class="topbar-left">
+        <div class="era-badge" id="era-badge">🌍 All of Human History</div>
+        <div class="mode-pills">
+          <div class="mode-pill active" onclick="setMode('scholar',this)">Scholar</div>
+          <div class="mode-pill" onclick="setMode('storyteller',this)">Storyteller</div>
+          <div class="mode-pill" onclick="setMode('quiz',this)">Quiz Me</div>
+          <div class="mode-pill" onclick="setMode('debate',this)">Debate</div>
+          <div class="mode-pill" onclick="setMode('professor',this)">🎓 Professor</div>
+        </div>
+      </div>
+      <div class="topbar-actions">
+        <div class="icon-btn" onclick="openModal('modal-research')" style="font-size:0.65rem;width:auto;padding:0 8px;font-family:Space Mono,monospace;letter-spacing:0.06em;color:var(--gold2);border-color:var(--border2)">🎓 Research<span class="tooltip">RESEARCH WORKSHOP</span></div>
+        <div class="icon-btn" onclick="openModal('modal-chrono')">⏳<span class="tooltip">CHRONOLOGY BUILDER</span></div>
+        <div class="icon-btn" onclick="openModal('modal-doctrans')">📜<span class="tooltip">DOCUMENT TRANSLATOR</span></div>
+        <div class="icon-btn" onclick="openModal('modal-map')">🗺️<span class="tooltip">EXPLORE BY REGION</span></div>
+        <div class="icon-btn" onclick="openModal('modal-compare')">⚖️<span class="tooltip">COMPARE SUBJECTS</span></div>
+        <div class="icon-btn" onclick="openModal('modal-search')">🔍<span class="tooltip">SEARCH CHAT</span></div>
+        <div class="icon-btn" onclick="showQuizScore()">🏺<span class="tooltip">QUIZ SCORE</span></div>
+        <div class="icon-btn" onclick="openModal('modal-export')">📤<span class="tooltip">EXPORT</span></div>
+        <div class="icon-btn" onclick="clearChat()">🗑️<span class="tooltip">CLEAR CHAT</span></div>
+      </div>
+    </div>
+    <div class="timeline-strip">
+      <div class="tl-item" onclick="askTopic('Tell me about ancient Mesopotamia and the Sumerian civilization')"><div class="tl-node"></div><div class="tl-label">3500 BCE<br>Sumer</div></div><div class="tl-line"></div>
+      <div class="tl-item" onclick="askTopic('Tell me about Ancient Egypt and the pharaohs')"><div class="tl-node"></div><div class="tl-label">3100 BCE<br>Egypt</div></div><div class="tl-line"></div>
+      <div class="tl-item" onclick="askTopic('What made Classical Greece so culturally significant?')"><div class="tl-node"></div><div class="tl-label">500 BCE<br>Greece</div></div><div class="tl-line"></div>
+      <div class="tl-item" onclick="askTopic('Tell me about the Roman Republic and Empire')"><div class="tl-node"></div><div class="tl-label">27 BCE<br>Rome</div></div><div class="tl-line"></div>
+      <div class="tl-item" onclick="askTopic('What were the Crusades and why did they happen?')"><div class="tl-node"></div><div class="tl-label">1095<br>Crusades</div></div><div class="tl-line"></div>
+      <div class="tl-item" onclick="askTopic('What happened during the Black Death?')"><div class="tl-node"></div><div class="tl-label">1347<br>Plague</div></div><div class="tl-line"></div>
+      <div class="tl-item" onclick="askTopic('What made the Renaissance a turning point in human history?')"><div class="tl-node"></div><div class="tl-label">1400s<br>Renaissance</div></div><div class="tl-line"></div>
+      <div class="tl-item" onclick="askTopic('Explain the Age of Exploration and Columbus')"><div class="tl-node"></div><div class="tl-label">1492<br>Columbus</div></div><div class="tl-line"></div>
+      <div class="tl-item" onclick="askTopic('How did the French Revolution unfold?')"><div class="tl-node"></div><div class="tl-label">1789<br>Revolution</div></div><div class="tl-line"></div>
+      <div class="tl-item" onclick="askTopic('What was the Industrial Revolution?')"><div class="tl-node"></div><div class="tl-label">1760s<br>Industry</div></div><div class="tl-line"></div>
+      <div class="tl-item" onclick="askTopic('What caused World War I?')"><div class="tl-node"></div><div class="tl-label">1914<br>WWI</div></div><div class="tl-line"></div>
+      <div class="tl-item" onclick="askTopic('What were the main causes and events of World War II?')"><div class="tl-node"></div><div class="tl-label">1939<br>WWII</div></div><div class="tl-line"></div>
+      <div class="tl-item" onclick="askTopic('How did the Cold War shape the 20th century?')"><div class="tl-node"></div><div class="tl-label">1947<br>Cold War</div></div>
+    </div>
+    <div class="main-wrap">
+      <div class="messages" id="messages">
+        <div class="welcome" id="welcome">
+          <div class="welcome-emblem">📜</div>
+          <h2>CHRONICLER</h2>
+          <div class="divider"></div>
+          <p class="sub">"Those who cannot remember the past are condemned to repeat it." Ask me about any civilization, event, or figure — from the dawn of time to the modern era.</p>
+          <div class="starters">
+            <button class="starter-btn" onclick="useStarter(this)">What really caused the fall of Rome?</button>
+            <button class="starter-btn" onclick="useStarter(this)">Who were history's greatest military strategists?</button>
+            <button class="starter-btn" onclick="useStarter(this)">How did the printing press change the world?</button>
+            <button class="starter-btn" onclick="useStarter(this)">What was daily life like in ancient Rome?</button>
+            <button class="starter-btn" onclick="useStarter(this)">Why did the Ottoman Empire decline?</button>
+            <button class="starter-btn" onclick="useStarter(this)">Explain the impact of the Columbian Exchange</button>
+          </div>
+        </div>
+      </div>
+      <button class="scroll-btn" id="scroll-btn" onclick="scrollToBottom()" title="Scroll to bottom">↓</button>
+    </div>
+    <div class="input-area">
+      <div class="input-tools">
+        <button class="input-tool-btn" id="voice-btn" onclick="toggleVoice()">🎙 Voice Input</button>
+        <button class="input-tool-btn" onclick="getRandomFact()">🎲 Random Fact</button>
+        <button class="input-tool-btn" onclick="openModal('modal-compare')">⚖️ Compare</button>
+        <button class="input-tool-btn" onclick="openModal('modal-map')">🗺️ Regions</button>
+        <button class="input-tool-btn" onclick="openModal('modal-research')" style="border-color:rgba(200,146,58,0.3);color:var(--gold)">🎓 Research</button>
+        <button class="input-tool-btn" onclick="openModal('modal-doctrans')">📜 Translate Doc</button>
+      </div>
+      <div class="suggestion-chips" id="suggestion-chips"></div>
+      <div class="input-wrap">
+        <textarea id="user-input" placeholder="Ask about any era, civilization, event, or figure…" rows="1"></textarea>
+        <button class="send-btn" id="send-btn" onclick="sendMessage()">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+        </button>
+      </div>
+      <div class="input-footer">
+        <div class="input-hint">Press <span>Enter</span> to send · <span>Shift+Enter</span> for new line</div>
+        <div class="char-count" id="char-count"></div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+// ── CONFIG — key is stored in user's browser, never in the code ──
+const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
+const GROQ_MODEL = 'llama-3.3-70b-versatile';
+function getGroqKey() { return localStorage.getItem('chronicler_groq_key') || ''; }
+
+// ── Groq single-prompt helper ──
+async function callGemini(userPrompt, systemPrompt, maxTokens) {
+  const key = getGroqKey();
+  if (!key) { showApiKeyModal(); throw new Error('No API key set.'); }
+  const messages = [];
+  if (systemPrompt) messages.push({ role: 'system', content: systemPrompt });
+  messages.push({ role: 'user', content: userPrompt });
+  const res = await fetch(GROQ_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${key}`
+    },
+    body: JSON.stringify({ model: GROQ_MODEL, messages, max_tokens: maxTokens || 1000 })
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error?.message || `HTTP ${res.status}`);
+  }
+  const data = await res.json();
+  return data.choices?.[0]?.message?.content || '';
+}
+
+// ── Groq multi-turn chat helper ──
+async function callGeminiChat(history, systemPrompt, maxTokens) {
+  const key = getGroqKey();
+  if (!key) { showApiKeyModal(); throw new Error('No API key set.'); }
+  const messages = [];
+  if (systemPrompt) messages.push({ role: 'system', content: systemPrompt });
+  history.forEach(m => messages.push({
+    role: m.role === 'assistant' ? 'assistant' : 'user',
+    content: m.content
+  }));
+  const res = await fetch(GROQ_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${key}`
+    },
+    body: JSON.stringify({ model: GROQ_MODEL, messages, max_tokens: maxTokens || 1000 })
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error?.message || `HTTP ${res.status}`);
+  }
+  const data = await res.json();
+  return data.choices?.[0]?.message?.content || '';
+}
+
+// ── STATE ──
+let chatHistory = [];
+let isLoading = false;
+let currentEra = 'All of Human History';
+let currentMode = 'scholar';
+let otdTopic = '';
+let savedItems = JSON.parse(localStorage.getItem('chronicler_saved') || '[]');
+let quizStats = JSON.parse(localStorage.getItem('chronicler_quiz') || '{"correct":0,"total":0}');
+let voiceRecognition = null;
+let isRecording = false;
+
+const messagesEl = document.getElementById('messages');
+const inputEl    = document.getElementById('user-input');
+const sendBtn    = document.getElementById('send-btn');
+const eraBadge   = document.getElementById('era-badge');
+const charCount  = document.getElementById('char-count');
+const scrollBtn  = document.getElementById('scroll-btn');
+
+// ── SYSTEM PROMPTS ──
+const systemPrompts = {
+  scholar: `You are Chronicler — an expert AI historian with encyclopedic knowledge spanning all of human history. You are authoritative, precise, and intellectually rigorous. Provide deep context: causes, consequences, key figures, dates, and historiographical debate. Use **bold** for key terms, names, and dates. After your answer, always append 3 follow-up questions as:
+SUGGESTIONS:
+• [question 1]
+• [question 2]
+• [question 3]
+Current focus era: {ERA}.`,
+
+  storyteller: `You are Chronicler — a masterful historical storyteller. Bring history alive through vivid narrative, sensory detail, human drama, and emotional truth. Write in a literary voice. After your narrative, append:
+SUGGESTIONS:
+• [story angle 1]
+• [story angle 2]
+• [story angle 3]
+Current focus era: {ERA}.`,
+
+  quiz: `You are Chronicler in Quiz Mode — an enthusiastic history professor. Answer any question, then immediately challenge the user with a new quiz question. When the user answers correctly, celebrate with 🏺. After each exchange, append:
+SUGGESTIONS:
+• [harder follow-up question]
+• [related topic to explore]
+• [lateral thinking question]
+Current focus era: {ERA}.`,
+
+  debate: `You are Chronicler in Debate Mode. Take strong, well-reasoned historical positions and defend them. Challenge assumptions, highlight revisionist interpretations. End responses with:
+SUGGESTIONS:
+• [a counterargument to consider]
+• [a related historical controversy]
+• [a thought experiment]
+Current focus era: {ERA}.`,
+
+  professor: `You are Chronicler in Professor Mode — delivering authoritative university-level lectures. Structure every response as a mini-lecture: opening hook, background context, main analysis in numbered sections, synthesis paragraph, and "for further study" suggestions. Use **bold** for key terms. After your lecture, append:
+SUGGESTIONS:
+• [a seminar discussion question]
+• [a related lecture topic]
+• [a comparative angle to explore]
+Current focus era: {ERA}.`
+};
+
+// ── OTD ──
+async function initOTD() {
+  const otdEl    = document.getElementById('otd-text');
+  const otdAsk   = document.getElementById('otd-ask');
+  const otdLabel = document.querySelector('.otd-label');
+  const now = new Date();
+  const month = now.toLocaleString('en-US', { month: 'long' });
+  const day = now.getDate();
+  const dateStr = `${month} ${day}`;
+  if (otdLabel) otdLabel.textContent = `📅 ${dateStr.toUpperCase()}`;
+  otdEl.textContent = 'Consulting the archives…';
+
+  const prompt = `Today's date is ${dateStr}. What is the single most historically significant event that actually occurred on ${dateStr} in any year of history? It must have genuinely happened on this exact calendar date. Reply with ONLY raw JSON, no markdown:
+{"year":"1066","headline":"one sentence max 18 words","detail":"two sentences of context","topic":"a follow-up question"}`;
+
+  try {
+    const raw = await callGemini(prompt, null, 300);
+    const match = raw.match(/\{[\s\S]*\}/);
+    if (!match) throw new Error('No JSON');
+    const evt = JSON.parse(match[0]);
+    if (!evt.year || !evt.headline) throw new Error('Incomplete');
+    otdTopic = evt.topic || `Tell me more about what happened on ${dateStr}`;
+    otdEl.innerHTML = `<strong style="color:var(--gold2)">${esc(evt.year)}</strong> — ${esc(evt.headline)}<br><span style="font-size:0.65rem;opacity:0.78;margin-top:5px;display:block;line-height:1.5">${esc(evt.detail)}</span>`;
+    if (otdAsk) otdAsk.style.display = 'inline-block';
+  } catch(e) {
+    try {
+      const text = await callGemini(`In one factual sentence starting with the year, what is the most historically significant event that happened on ${dateStr} in history?`, null, 100);
+      if (text) {
+        otdEl.textContent = text;
+        otdTopic = `Tell me more about this historical event: ${text}`;
+        if (otdAsk) otdAsk.style.display = 'inline-block';
+      } else { otdEl.textContent = `Could not load event for ${dateStr}.`; }
+    } catch { otdEl.textContent = `Could not load event for ${dateStr}. Check your API key.`; }
+  }
+}
+function askOTD() { if (otdTopic) askTopic(otdTopic); }
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// ── SIDEBAR TABS ──
+function switchTab(name, el) {
+  document.querySelectorAll('.stab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.sidebar-panel').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('tab-' + name).classList.add('active');
+  if (name === 'saved') renderSaved();
+}
+
+// ── ERA / MODE ──
+const eraIcons = {'Ancient World':'🏛️','Medieval Period':'⚔️','Renaissance':'🎨','Age of Exploration':'⛵','Modern Era':'🏭','All of Human History':'🌍'};
+function setEra(era, btn) {
+  currentEra = era;
+  document.querySelectorAll('.era-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  eraBadge.textContent = (eraIcons[era]||'🌍') + ' ' + era;
+  showToast('Era: ' + era);
+}
+function setMode(mode, btn) {
+  currentMode = mode;
+  document.querySelectorAll('.mode-pill').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  const labels = {scholar:'Scholar Mode',storyteller:'Storyteller Mode',quiz:'Quiz Mode',debate:'Debate Mode',professor:'Professor Mode'};
+  showToast(labels[mode] + ' activated');
+  clearSuggestionChips();
+}
+
+// ── MODALS ──
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+function closeAllModals() { document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('open')); }
+document.querySelectorAll('.modal-overlay').forEach(m => {
+  m.addEventListener('click', e => { if (e.target === m) m.classList.remove('open'); });
+});
+
+// ── SUGGESTIONS ──
+function setSuggestions(arr) {
+  const c = document.getElementById('suggestion-chips');
+  c.innerHTML = '';
+  arr.slice(0,4).forEach((s,i) => {
+    const chip = document.createElement('div');
+    chip.className = 'sug-chip';
+    chip.style.animationDelay = (i * 0.06) + 's';
+    chip.textContent = s;
+    chip.onclick = () => { inputEl.value = s; inputEl.dispatchEvent(new Event('input')); sendMessage(); };
+    c.appendChild(chip);
+  });
+}
+function clearSuggestionChips() { document.getElementById('suggestion-chips').innerHTML = ''; }
+function parseSuggestions(text) {
+  const match = text.match(/SUGGESTIONS:\s*([\s\S]*?)(?:\n\n|$)/);
+  if (!match) return { clean: text, suggestions: [] };
+  const lines = match[1].split('\n').map(l => l.replace(/^[•\-\*]\s*/, '').trim()).filter(Boolean);
+  const clean = text.replace(/SUGGESTIONS:[\s\S]*$/, '').trim();
+  return { clean, suggestions: lines };
+}
+
+// ── INPUT ──
+inputEl.addEventListener('input', () => {
+  inputEl.style.height = 'auto';
+  inputEl.style.height = Math.min(inputEl.scrollHeight, 120) + 'px';
+  const l = inputEl.value.length;
+  charCount.textContent = l > 60 ? l + ' chars' : '';
+});
+inputEl.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+});
+function useStarter(btn) { inputEl.value = btn.textContent.trim(); inputEl.dispatchEvent(new Event('input')); sendMessage(); }
+function askTopic(text) { inputEl.value = text; inputEl.dispatchEvent(new Event('input')); sendMessage(); }
+
+// ── RANDOM FACT ──
+const randomFacts = [
+  "What's the most surprising or counterintuitive fact about ancient Rome?",
+  "Tell me a little-known but fascinating detail about the construction of the Pyramids",
+  "What's a commonly believed historical myth that is actually false?",
+  "What was the strangest law or custom in medieval Europe?",
+  "Tell me about an important historical figure that most people have never heard of",
+  "What historical coincidence is almost too strange to believe?",
+  "Which ancient civilization was more advanced than most people realize?",
+  "What everyday modern thing has surprisingly ancient origins?",
+];
+function getRandomFact() { askTopic(randomFacts[Math.floor(Math.random() * randomFacts.length)]); }
+
+// ── COMPARE ──
+function runCompare() {
+  const a = document.getElementById('compare-a').value.trim();
+  const b = document.getElementById('compare-b').value.trim();
+  const aspect = document.getElementById('compare-aspect').value;
+  if (!a || !b) { showToast('Enter both subjects first'); return; }
+  closeModal('modal-compare');
+  askTopic(`Compare and contrast ${a} vs ${b} — focus on: ${aspect}. Use a structured format with clear sections for each subject.`);
+}
+
+// ── VOICE INPUT ──
+function toggleVoice() {
+  if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) { showToast('Voice input not supported in this browser'); return; }
+  if (isRecording) { voiceRecognition && voiceRecognition.stop(); return; }
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  voiceRecognition = new SR();
+  voiceRecognition.continuous = false; voiceRecognition.interimResults = true; voiceRecognition.lang = 'en-US';
+  voiceRecognition.onresult = e => { inputEl.value = Array.from(e.results).map(r => r[0].transcript).join(''); inputEl.dispatchEvent(new Event('input')); };
+  voiceRecognition.onend = () => { isRecording = false; document.getElementById('voice-btn').classList.remove('recording'); document.getElementById('voice-btn').textContent = '🎙 Voice Input'; };
+  voiceRecognition.onerror = () => { showToast('Voice recognition error'); };
+  voiceRecognition.start();
+  isRecording = true;
+  document.getElementById('voice-btn').classList.add('recording');
+  document.getElementById('voice-btn').textContent = '⏹ Recording…';
+}
+
+// ── MESSAGES ──
+function dismissWelcome() {
+  const w = document.getElementById('welcome');
+  if (w && messagesEl.contains(w)) {
+    w.style.transition = 'opacity 0.3s, transform 0.3s'; w.style.opacity = '0'; w.style.transform = 'scale(0.97)';
+    setTimeout(() => { if (w.parentNode) w.remove(); }, 300);
+  }
+}
+function formatText(text) {
+  let t = text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  t = t.replace(/\*\*(.+?)\*\*/g, '<strong style="color:var(--gold2);font-weight:600">$1</strong>');
+  t = t.replace(/\*([^*\n]+)\*/g, '<em>$1</em>');
+  return t;
+}
+function addMessage(role, text, sources) {
+  dismissWelcome();
+  const isAI = role === 'ai';
+  const div = document.createElement('div');
+  div.className = `msg ${role}`;
+  const sourcesHtml = (isAI && sources && sources.length) ? `<div class="source-strip">${sources.map(s=>`<span class="source-tag">${s}</span>`).join('')}</div>` : '';
+  div.innerHTML = `
+    <div class="msg-avatar">${isAI ? '📜' : '◎'}</div>
+    <div class="msg-body">
+      <div class="msg-label">${isAI ? 'CHRONICLER' : 'YOU'}</div>
+      <div class="msg-bubble">${formatText(text)}</div>
+      ${sourcesHtml}
+      ${isAI ? `<div class="msg-actions">
+        <button class="msg-action-btn" onclick="copyMsg(this)">Copy</button>
+        <button class="msg-action-btn" onclick="saveMsg(this)">Save</button>
+        <button class="msg-action-btn" onclick="goDeeper(this)">Go deeper →</button>
+        <button class="msg-action-btn" onclick="askRelated(this)">Related →</button>
+        <button class="msg-action-btn" onclick="speakMsg(this)">🔊 Read</button>
+      </div>
+      <div class="msg-wc">${text.trim().split(/\s+/).length} words</div>` : ''}
+    </div>`;
+  messagesEl.appendChild(div);
+  scrollToBottom();
+}
+function copyMsg(btn) { navigator.clipboard.writeText(btn.closest('.msg-body').querySelector('.msg-bubble').innerText).then(() => showToast('Copied')); }
+function saveMsg(btn) {
+  const t = btn.closest('.msg-body').querySelector('.msg-bubble').innerText;
+  const item = { id: Date.now(), title: t.slice(0,80).trim() + (t.length>80?'…':''), full: t, era: currentEra, date: new Date().toLocaleDateString() };
+  savedItems.unshift(item);
+  if (savedItems.length > 50) savedItems = savedItems.slice(0,50);
+  localStorage.setItem('chronicler_saved', JSON.stringify(savedItems));
+  btn.textContent = '✓ Saved'; btn.classList.add('saved');
+  showToast('Saved to bookmarks');
+}
+function goDeeper(btn) { const t = btn.closest('.msg-body').querySelector('.msg-bubble').innerText.slice(0,100); inputEl.value = `Tell me more about: "${t.trim()}…"`; inputEl.dispatchEvent(new Event('input')); inputEl.focus(); }
+function askRelated(btn) { const t = btn.closest('.msg-body').querySelector('.msg-bubble').innerText.slice(0,100); inputEl.value = `What are related historical events or topics connected to: "${t.trim()}…"?`; inputEl.dispatchEvent(new Event('input')); inputEl.focus(); }
+function speakMsg(btn) {
+  if (!window.speechSynthesis) { showToast('Text-to-speech not supported'); return; }
+  const t = btn.closest('.msg-body').querySelector('.msg-bubble').innerText;
+  if (speechSynthesis.speaking) { speechSynthesis.cancel(); btn.textContent = '🔊 Read'; return; }
+  const utt = new SpeechSynthesisUtterance(t);
+  utt.rate = 0.92; utt.pitch = 0.95;
+  const voices = speechSynthesis.getVoices();
+  const pref = voices.find(v => v.name.includes('Daniel') || v.name.includes('Google UK') || v.lang === 'en-GB');
+  if (pref) utt.voice = pref;
+  utt.onend = () => { btn.textContent = '🔊 Read'; };
+  btn.textContent = '⏹ Stop';
+  speechSynthesis.speak(utt);
+}
+
+// ── SAVED ──
+function renderSaved() {
+  const list = document.getElementById('saved-list');
+  const empty = document.getElementById('saved-empty');
+  [...list.querySelectorAll('.saved-item')].forEach(el => el.remove());
+  if (savedItems.length === 0) { if(empty) empty.style.display='block'; return; }
+  if (empty) empty.style.display = 'none';
+  savedItems.forEach(item => {
+    const div = document.createElement('div'); div.className = 'saved-item';
+    div.innerHTML = `<div class="saved-item-title">${item.title}</div><div class="saved-item-meta">${item.era} · ${item.date}</div><button class="saved-item-del" onclick="deleteSaved(${item.id},event)">✕</button>`;
+    div.addEventListener('click', () => { addMessage('ai', item.full); showToast('Loaded from bookmarks'); });
+    list.appendChild(div);
+  });
+}
+function deleteSaved(id, e) { e.stopPropagation(); savedItems = savedItems.filter(s => s.id !== id); localStorage.setItem('chronicler_saved', JSON.stringify(savedItems)); renderSaved(); }
+
+// ── TYPING ──
+function addTypingIndicator() {
+  dismissWelcome();
+  const div = document.createElement('div'); div.className = 'msg ai'; div.id = 'typing';
+  div.innerHTML = `<div class="msg-avatar">📜</div><div class="msg-body"><div class="msg-label">CHRONICLER</div><div class="typing-indicator"><div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div></div></div>`;
+  messagesEl.appendChild(div); scrollToBottom();
+}
+function removeTypingIndicator() { const el = document.getElementById('typing'); if (el) el.remove(); }
+function addError(msg) { const div = document.createElement('div'); div.className='error-bubble'; div.textContent='⚠ '+msg; messagesEl.appendChild(div); scrollToBottom(); }
+
+// ── SCROLL ──
+function scrollToBottom() { messagesEl.scrollTo({ top: messagesEl.scrollHeight, behavior: 'smooth' }); }
+messagesEl.addEventListener('scroll', () => {
+  const atBottom = messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight < 100;
+  scrollBtn.classList.toggle('visible', !atBottom && messagesEl.scrollTop > 200);
+});
+
+// ── SEARCH ──
+function doSearch() {
+  const q = document.getElementById('search-input').value.trim().toLowerCase();
+  const res = document.getElementById('search-results'); res.innerHTML = '';
+  if (!q) return;
+  chatHistory.filter(m => m.content.toLowerCase().includes(q)).slice(0,8).forEach((m,i) => {
+    const div = document.createElement('div'); div.className = 'search-result';
+    const idx = m.content.toLowerCase().indexOf(q);
+    const preview = m.content.slice(Math.max(0,idx-40), idx+80).trim();
+    div.innerHTML = `<div class="sr-q">"…${preview}…"</div><div class="sr-meta">${m.role.toUpperCase()} · message ${i+1}</div>`;
+    div.onclick = () => { closeModal('modal-search'); showToast('Result found in chat'); };
+    res.appendChild(div);
+  });
+  if (!res.children.length) res.innerHTML = `<div style="text-align:center;padding:20px;color:var(--muted);font-size:0.75rem;font-style:italic">No matches found.</div>`;
+}
+
+// ── QUIZ SCORE ──
+function showQuizScore() {
+  document.getElementById('quiz-score-num').textContent = quizStats.correct;
+  document.getElementById('qs-correct').textContent = quizStats.correct;
+  document.getElementById('qs-total').textContent = quizStats.total;
+  document.getElementById('qs-pct').textContent = quizStats.total > 0 ? Math.round(quizStats.correct/quizStats.total*100)+'%' : '—';
+  const badges = document.getElementById('quiz-badges'); badges.innerHTML = '';
+  if (quizStats.correct >= 1) badges.innerHTML += `<span class="badge gold">🏺 First Scroll</span>`;
+  if (quizStats.correct >= 5) badges.innerHTML += `<span class="badge gold">⚔️ Apprentice</span>`;
+  if (quizStats.correct >= 10) badges.innerHTML += `<span class="badge silver">📜 Scholar</span>`;
+  if (quizStats.correct >= 20) badges.innerHTML += `<span class="badge crimson">👑 Historian</span>`;
+  openModal('modal-quiz');
+}
+
+// ── EXPORT ──
+function exportAs(format) {
+  closeModal('modal-export');
+  const msgs = chatHistory.map(m => ({ role: m.role, text: m.content }));
+  if (!msgs.length) { showToast('No conversation to export'); return; }
+  const date = new Date().toLocaleDateString();
+  let content = '', filename = '', type = '';
+  if (format === 'txt') {
+    content = `CHRONICLER — History AI\nDate: ${date}\nEra: ${currentEra}\n\n` + msgs.map(m => `[${m.role.toUpperCase()}]\n${m.text}`).join('\n\n---\n\n');
+    filename = 'chronicler-chat.txt'; type = 'text/plain';
+  } else if (format === 'md') {
+    content = `# CHRONICLER Conversation\n*${date} · ${currentEra}*\n\n` + msgs.map(m => m.role==='user'?`**You:** ${m.text}`:`**Chronicler:** ${m.text}`).join('\n\n---\n\n');
+    filename = 'chronicler-chat.md'; type = 'text/markdown';
+  } else if (format === 'html') {
+    const rows = msgs.map(m => m.role==='user' ? `<div style="text-align:right;margin:12px 0"><span style="background:#3a2400;border:1px solid #c8923a33;border-radius:12px;padding:10px 14px;display:inline-block;max-width:70%;font-family:Georgia,serif;color:#e8d9b0;font-size:14px">${m.text.replace(/\n/g,'<br>')}</span></div>` : `<div style="margin:12px 0"><span style="background:#16120c;border:1px solid #c8923a33;border-radius:12px;padding:10px 14px;display:inline-block;max-width:70%;font-family:Georgia,serif;color:#ddd0b0;font-size:14px">${m.text.replace(/\n/g,'<br>')}</span></div>`).join('');
+    content = `<!DOCTYPE html><html><head><title>Chronicler</title><style>body{background:#0d0b08;padding:20px;max-width:700px;margin:0 auto}h1{font-family:Georgia;color:#e8c06a}p{color:#6a5a3a;font-size:0.75rem}</style></head><body><h1>📜 CHRONICLER</h1><p>${date} · ${currentEra}</p>${rows}</body></html>`;
+    filename = 'chronicler-chat.html'; type = 'text/html';
+  }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([content],{type})); a.download = filename; a.click();
+  showToast('Exported as ' + filename);
+}
+
+// ── SEND ──
+async function sendMessage() {
+  const text = inputEl.value.trim();
+  if (!text || isLoading) return;
+  isLoading = true; sendBtn.disabled = true;
+  inputEl.value = ''; inputEl.style.height = 'auto'; charCount.textContent = '';
+  clearSuggestionChips();
+  addMessage('user', text);
+  chatHistory.push({ role: 'user', content: text });
+  addTypingIndicator();
+  animateProgress(['Consulting the archives…', 'Cross-referencing sources…', 'Preparing response…']);
+  const sysPrompt = systemPrompts[currentMode].replace('{ERA}', currentEra);
+  try {
+    const rawReply = await callGeminiChat(chatHistory, sysPrompt, 1000);
+    const { clean, suggestions } = parseSuggestions(rawReply);
+    removeTypingIndicator(); stopProgress();
+    const sources = extractSourceTags(clean, currentEra);
+    addMessage('ai', clean, sources);
+    chatHistory.push({ role: 'assistant', content: rawReply });
+    if (currentMode === 'quiz' && (rawReply.includes('🏺') || rawReply.toLowerCase().includes('correct'))) quizStats.correct++;
+    if (currentMode === 'quiz') { quizStats.total++; localStorage.setItem('chronicler_quiz', JSON.stringify(quizStats)); }
+    if (suggestions.length) setSuggestions(suggestions);
+  } catch(err) {
+    removeTypingIndicator(); stopProgress();
+    addError(err.message || 'The archives are temporarily unavailable.');
+  } finally {
+    isLoading = false; sendBtn.disabled = false; inputEl.focus();
+  }
+}
+
+function extractSourceTags(text, era) {
+  const tags = [];
+  if (text.includes('BCE') || text.includes('BC')) tags.push('Classical Sources');
+  if (text.includes('primary source') || text.includes('chronicle')) tags.push('Primary Sources');
+  if (era.includes('Medieval')) tags.push('Medieval Records');
+  if (era.includes('Ancient')) tags.push('Ancient Texts');
+  if (text.includes('Herodotus') || text.includes('Thucydides')) tags.push('Greek Historians');
+  if (text.includes('Tacitus') || text.includes('Livy') || text.includes('Suetonius')) tags.push('Roman Historians');
+  if (text.includes('ibn') || text.includes('Ibn')) tags.push('Islamic Sources');
+  return tags.slice(0,3);
+}
+
+// ── PROGRESS ──
+let progressInterval = null;
+function animateProgress(steps) {
+  const overlay = document.getElementById('progress-overlay');
+  const bar = document.getElementById('progress-bar');
+  const sub = document.getElementById('progress-sub');
+  let step = 0, pct = 0;
+  overlay.classList.add('open');
+  progressInterval = setInterval(() => {
+    pct = Math.min(pct + Math.random() * 18, 85);
+    bar.style.width = pct + '%';
+    if (step < steps.length) { sub.textContent = steps[step]; step++; }
+  }, 700);
+}
+function stopProgress() {
+  clearInterval(progressInterval);
+  const bar = document.getElementById('progress-bar');
+  bar.style.width = '100%';
+  setTimeout(() => { document.getElementById('progress-overlay').classList.remove('open'); bar.style.width='0%'; }, 300);
+}
+
+// ── TOOLBAR ──
+function clearChat() {
+  if (!chatHistory.length) { showToast('Nothing to clear'); return; }
+  chatHistory = []; messagesEl.innerHTML = '';
+  const div = document.createElement('div');
+  div.style.cssText = 'text-align:center;padding:40px;color:var(--muted);font-size:0.8rem;font-style:italic;font-family:Crimson Pro,serif;';
+  div.textContent = 'The scrolls have been cleared. Begin a new inquiry…';
+  messagesEl.appendChild(div);
+  clearSuggestionChips(); showToast('Conversation cleared');
+}
+
+// ── RESEARCH WORKSHOP ──
+function rwTab(name, el) {
+  document.querySelectorAll('.rw-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.rw-panel').forEach(p => p.classList.remove('active'));
+  if (el) el.classList.add('active');
+  document.getElementById('rwp-' + name).classList.add('active');
+}
+function rwTabByName(name) {
+  const tabs = document.querySelectorAll('.rw-tab');
+  const names = ['thesis','outline','bibliography','source','historiography','abstract','argument'];
+  tabs.forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.rw-panel').forEach(p => p.classList.remove('active'));
+  const idx = names.indexOf(name);
+  if (idx >= 0 && tabs[idx]) tabs[idx].classList.add('active');
+  const panel = document.getElementById('rwp-' + name);
+  if (panel) panel.classList.add('active');
+  openModal('modal-research');
+}
+function selectCiteStyle(btn, style) {
+  document.querySelectorAll('.cite-style-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('rw-cite-style').value = style;
+}
+
+const rwPrompts = {
+  thesis: d => `You are an expert academic historian. Generate a strong, arguable thesis statement for a ${d.type} on: "${d.topic}". ${d.arg?'Student preliminary argument: '+d.arg:''}
+Produce: 1) Primary thesis (2-3 sentences, specific and arguable) 2) Two alternative framings 3) Brief note on supporting evidence. Use formal academic language.`,
+  outline: d => `You are an expert academic historian. Create a detailed scholarly outline for a ${d.length} using ${d.method} approach on: "${d.topic}". Include: title suggestion, introduction with hook and thesis placement, all body sections with subsections and content notes, conclusion structure, source balance note. Format with Roman numerals and letters.`,
+  bibliography: d => `You are a specialist research librarian. Generate an annotated bibliography of 8-10 real scholarly sources for: "${d.topic}". Citation style: ${d.style}. Sources: ${d.types}. For each: full citation in ${d.style} format + 2-sentence annotation on argument and relevance. Include landmark monographs and peer-reviewed articles.`,
+  source: d => `You are a professional historian trained in source criticism. Analyse this historical source using ${d.focus}:
+
+SOURCE: "${d.text}"
+
+Provide: 1) Identification 2) Historical Context 3) Author/Creator Analysis 4) Content Analysis 5) Reliability Assessment 6) Historical Value 7) Cross-reference suggestions. Use **bold** for key terms.`,
+  historiography: d => `You are a senior historian. Write a scholarly historiographical essay on: "${d.topic}". Focus: ${d.scope}. Structure: introduce the debate, survey major schools of thought chronologically, identify key historians and arguments, analyse shifts in interpretation, assess current consensus, conclude with gaps and future directions. Use **bold** for historian names.`,
+  abstract: d => `You are an academic editor. Write a ${d.length} abstract in ${d.style} style for this paper: ${d.text}. The abstract must: state research question first, note methodology and sources, summarise main findings, state historical significance. Use formal academic register.`,
+  argument: d => `You are a historian and academic debater. For the claim: "${d.claim}", generate: ${d.type}. For each argument: state position clearly, provide 2-3 pieces of historical evidence, name relevant historians, note limitations. Write with scholarly rigour.`
+};
+
+async function rwGenerate(type) {
+  const outEl = document.getElementById('rwo-' + type);
+  const actEl = document.getElementById('rwoa-' + type);
+  const btn   = document.querySelector(`#rwp-${type} .rw-btn`);
+  let data = {};
+  const getVal = id => (document.getElementById(id)||{}).value||'';
+  if (type==='thesis') { data={topic:getVal('rw-thesis-topic'),type:getVal('rw-thesis-type'),arg:getVal('rw-thesis-arg')}; if(!data.topic){showToast('Enter a research topic');return;} }
+  else if (type==='outline') { data={topic:getVal('rw-outline-topic'),length:getVal('rw-outline-length'),method:getVal('rw-outline-method')}; if(!data.topic){showToast('Enter a paper topic');return;} }
+  else if (type==='bibliography') { data={topic:getVal('rw-bib-topic'),style:getVal('rw-cite-style'),types:getVal('rw-bib-types')}; if(!data.topic){showToast('Enter a research topic');return;} }
+  else if (type==='source') { data={text:getVal('rw-source-text'),focus:getVal('rw-source-focus')}; if(!data.text){showToast('Paste a source to analyse');return;} }
+  else if (type==='historiography') { data={topic:getVal('rw-histo-topic'),scope:getVal('rw-histo-scope')}; if(!data.topic){showToast('Enter a historical topic');return;} }
+  else if (type==='abstract') { data={text:getVal('rw-abstract-text'),length:getVal('rw-abstract-len'),style:getVal('rw-abstract-style')}; if(!data.text){showToast('Paste your paper text');return;} }
+  else if (type==='argument') { data={claim:getVal('rw-arg-claim'),type:getVal('rw-arg-type')}; if(!data.claim){showToast('Enter a historical claim');return;} }
+  btn.disabled = true; btn.innerHTML = '<span class="rw-spinning">⏳</span> Working…';
+  outEl.textContent = 'Consulting the archives…'; outEl.classList.add('visible');
+  if (actEl) actEl.classList.remove('visible');
+  try {
+    const text = await callGemini(rwPrompts[type](data), null, 1200);
+    outEl.innerHTML = formatRwText(text);
+    if (actEl) actEl.classList.add('visible');
+  } catch(e) {
+    outEl.textContent = '⚠ Error: ' + (e.message||'Could not reach the archives.');
+  } finally {
+    btn.disabled = false;
+    const labels = {thesis:'📌 Generate Thesis Statement',outline:'📋 Generate Full Outline',bibliography:'📚 Generate Bibliography',source:'🔍 Analyse Source',historiography:'🏛 Write Historiographical Essay',abstract:'📄 Write Abstract',argument:'⚔️ Generate Arguments'};
+    btn.textContent = labels[type]||'Generate';
+  }
+}
+function formatRwText(t) {
+  let s = t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  s = s.replace(/\*\*(.+?)\*\*/g,'<strong style="color:var(--gold2)">$1</strong>');
+  s = s.replace(/\*([^*\n]+)\*/g,'<em>$1</em>');
+  s = s.replace(/^#{1,3} (.+)$/gm,'<div style="font-family:Cinzel,serif;color:var(--gold2);font-size:0.82rem;margin:8px 0 4px;letter-spacing:0.06em">$1</div>');
+  return s;
+}
+function rwCopy(id) { navigator.clipboard.writeText(document.getElementById(id)?.innerText||'').then(()=>showToast('Copied')); }
+function rwSendToChat(id) {
+  const t = document.getElementById(id)?.innerText||''; if(!t) return;
+  closeAllModals(); addMessage('ai',t); chatHistory.push({role:'assistant',content:t}); showToast('Sent to chat');
+}
+function rwExportTxt(id, name) {
+  const t = document.getElementById(id)?.innerText||''; if(!t) return;
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([t],{type:'text/plain'}));
+  a.download = `chronicler-${name}-${Date.now()}.txt`; a.click(); showToast('Downloaded');
+}
+
+// ── CHRONOLOGY BUILDER ──
+function chronoAdd() {
+  const container = document.getElementById('chrono-events');
+  const row = document.createElement('div'); row.className = 'chrono-event-row';
+  row.innerHTML = `<input class="chrono-year-input" placeholder="Year / BCE" /><input class="chrono-event-input" placeholder="Event description…" /><button class="chrono-del" onclick="chronoDel(this)">✕</button>`;
+  container.appendChild(row); row.querySelector('.chrono-year-input').focus();
+}
+function chronoDel(btn) { if (document.querySelectorAll('.chrono-event-row').length > 1) btn.closest('.chrono-event-row').remove(); }
+async function buildChronology() {
+  const events = [];
+  document.querySelectorAll('.chrono-event-row').forEach(r => {
+    const yr = r.querySelector('.chrono-year-input').value.trim();
+    const ev = r.querySelector('.chrono-event-input').value.trim();
+    if (yr && ev) events.push(`${yr}: ${ev}`);
+  });
+  if (events.length < 2) { showToast('Add at least 2 events'); return; }
+  const focus = document.getElementById('chrono-focus').value;
+  const outEl = document.getElementById('rwo-chrono');
+  const actEl = document.getElementById('rwoa-chrono');
+  outEl.textContent = 'Building your chronology…'; outEl.classList.add('visible'); actEl.classList.remove('visible');
+  const prompt = `You are a historian creating a scholarly annotated chronology. Events:\n${events.map((e,i)=>`${i+1}. ${e}`).join('\n')}\n\nCreate a detailed annotated chronology with focus on: ${focus}. For each event: restate date and event, provide 2-3 sentences of scholarly annotation, note connections to other events. End with a brief paragraph on the overall historical arc.`;
+  try {
+    const text = await callGemini(prompt, null, 1200);
+    outEl.innerHTML = formatRwText(text); actEl.classList.add('visible');
+  } catch(e) { outEl.textContent = '⚠ Error: ' + e.message; }
+}
+
+// ── DOCUMENT TRANSLATOR ──
+async function translateDocument() {
+  const src   = document.getElementById('dt-source').value.trim();
+  const lang  = document.getElementById('dt-lang').value;
+  const out   = document.getElementById('dt-output').value;
+  const outEl = document.getElementById('rwo-doctrans');
+  const actEl = document.getElementById('rwoa-doctrans');
+  if (!src) { showToast('Paste a historical text to translate'); return; }
+  outEl.textContent = 'Translating the ancient text…'; outEl.classList.add('visible'); actEl.classList.remove('visible');
+  const prompt = `You are a scholar specialising in historical languages. Translate and analyse the following text.\n\nSource language/period: ${lang}\nOutput type: ${out}\n\nTEXT:\n"${src}"\n\nProvide:\n1. **Translation**: A faithful ${out.toLowerCase()}\n2. **Key Terms**: 3-5 significant words with original form and meaning\n3. **Historical Context**: When/where this type of text was produced\n4. **Scholarly Notes**: Annotations, ambiguities, alternative readings, significance`;
+  try {
+    const text = await callGemini(prompt, null, 1000);
+    outEl.innerHTML = formatRwText(text); actEl.classList.add('visible');
+  } catch(e) { outEl.textContent = '⚠ Translation error: ' + e.message; }
+}
+
+// ── TOAST ──
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(t._timer); t._timer = setTimeout(()=>t.classList.remove('show'), 2400);
+}
+
+// ── INIT ──
+renderSaved();
+inputEl.focus();
+
+// ── API KEY MANAGEMENT ──
+let currentProvider = 'groq'; // 'groq' | 'gemini' | 'openai'
+
+const PROVIDER_META = {
+  groq:   { label: 'Groq',          prefix: 'gsk_',  title: 'Enter Your Groq API Key',    inputLabel: 'Groq API Key (starts with gsk_)' },
+  gemini: { label: 'Google Gemini', prefix: 'AIza',  title: 'Enter Your Gemini API Key',  inputLabel: 'Gemini API Key (starts with AIza)' },
+  openai: { label: 'OpenAI',        prefix: 'sk-',   title: 'Enter Your OpenAI API Key',  inputLabel: 'OpenAI API Key (starts with sk-)' }
+};
+
+function getActiveKey() {
+  return localStorage.getItem('chronicler_key_' + currentProvider) || '';
+}
+// Override getGroqKey to use active provider key
+function getGroqKey() {
+  // Load last used provider from storage
+  const saved = localStorage.getItem('chronicler_provider');
+  if (saved) currentProvider = saved;
+  return localStorage.getItem('chronicler_key_' + currentProvider) || '';
+}
+
+function showApiKeyModal() {
+  // Restore saved provider
+  const saved = localStorage.getItem('chronicler_provider');
+  if (saved) currentProvider = saved;
+  const stored = getGroqKey();
+  if (stored) {
+    // Has key — jump straight to enter step with current key pre-filled
+    akeySelectProvider(currentProvider);
+    document.getElementById('akey-step2').style.display = 'none';
+    document.getElementById('akey-step3').style.display = 'block';
+    document.getElementById('akey-step1').style.display = 'none';
+    document.getElementById('akey-input').value = stored;
+  } else {
+    akeyBack();
+  }
+  document.getElementById('modal-apikey').classList.add('open');
+}
+
+function akeySelectProvider(provider) {
+  currentProvider = provider;
+  localStorage.setItem('chronicler_provider', provider);
+  const meta = PROVIDER_META[provider];
+
+  // Update step 3 labels
+  document.getElementById('akey-step3-title').textContent = meta.title;
+  document.getElementById('akey-input-label').textContent = meta.inputLabel;
+  document.getElementById('akey-input').value = localStorage.getItem('chronicler_key_' + provider) || '';
+  document.getElementById('akey-error').style.display = 'none';
+
+  // Show tutorial for this provider
+  document.getElementById('akey-step1').style.display = 'none';
+  document.getElementById('akey-step2').style.display = 'block';
+  document.getElementById('akey-step3').style.display = 'none';
+
+  ['groq','gemini','openai'].forEach(p => {
+    document.getElementById('akey-tutorial-' + p).style.display = (p === provider) ? 'block' : 'none';
+  });
+}
+
+function akeyShowEnter() {
+  document.getElementById('akey-step2').style.display = 'none';
+  document.getElementById('akey-step3').style.display = 'block';
+  setTimeout(() => document.getElementById('akey-input').focus(), 100);
+}
+
+function akeyBack() {
+  document.getElementById('akey-step1').style.display = 'block';
+  document.getElementById('akey-step2').style.display = 'none';
+  document.getElementById('akey-step3').style.display = 'none';
+}
+
+function akeyBack2Tutorial() {
+  document.getElementById('akey-step2').style.display = 'block';
+  document.getElementById('akey-step3').style.display = 'none';
+}
+
+function akeyToggleShow() {
+  const inp = document.getElementById('akey-input');
+  const btn = document.getElementById('akey-show-btn');
+  if (inp.type === 'password') { inp.type = 'text'; btn.textContent = 'Hide Key'; }
+  else { inp.type = 'password'; btn.textContent = '\uD83D\uDC41 Show Key'; }
+}
+
+function akeySubmit() {
+  const val = document.getElementById('akey-input').value.trim();
+  const errEl = document.getElementById('akey-error');
+  const meta = PROVIDER_META[currentProvider];
+  errEl.style.display = 'none';
+
+  if (!val) {
+    errEl.textContent = 'Please paste your API key first.';
+    errEl.style.display = 'block'; return;
+  }
+  if (!val.startsWith(meta.prefix)) {
+    errEl.textContent = meta.label + ' keys start with "' + meta.prefix + '". Please check and try again.';
+    errEl.style.display = 'block'; return;
+  }
+
+  localStorage.setItem('chronicler_key_' + currentProvider, val);
+  localStorage.setItem('chronicler_provider', currentProvider);
+  document.getElementById('modal-apikey').classList.remove('open');
+  updateKeyIndicator();
+  showToast('\u2713 ' + meta.label + ' key saved \u2014 welcome to Chronicler!');
+  initOTD();
+}
+
+function updateKeyIndicator() {
+  const ta = document.querySelector('.topbar-actions');
+  if (ta && !document.getElementById('topbar-key-btn')) {
+    const btn = document.createElement('div');
+    btn.id = 'topbar-key-btn';
+    btn.className = 'icon-btn';
+    const meta = PROVIDER_META[currentProvider] || PROVIDER_META.groq;
+    btn.innerHTML = '\uD83D\uDD11<span class="tooltip">CHANGE API KEY (' + meta.label.toUpperCase() + ')</span>';
+    btn.onclick = showApiKeyModal;
+    ta.insertBefore(btn, ta.firstChild);
+  } else if (document.getElementById('topbar-key-btn')) {
+    const meta = PROVIDER_META[currentProvider] || PROVIDER_META.groq;
+    document.getElementById('topbar-key-btn').innerHTML = '\uD83D\uDD11<span class="tooltip">CHANGE API KEY (' + meta.label.toUpperCase() + ')</span>';
+  }
+}
+
+// Update the two helpers to route by provider
+// Override callGemini to be provider-aware
+const _origCallGemini = callGemini;
+async function callGeminiRouted(userPrompt, systemPrompt, maxTokens) {
+  const saved = localStorage.getItem('chronicler_provider') || 'groq';
+  currentProvider = saved;
+  const key = localStorage.getItem('chronicler_key_' + currentProvider) || '';
+  if (!key) { showApiKeyModal(); throw new Error('No API key set.'); }
+
+  if (currentProvider === 'gemini') {
+    // Gemini format
+    const url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' + key;
+    const body = { contents: [{ role: 'user', parts: [{ text: userPrompt }] }], generationConfig: { maxOutputTokens: maxTokens || 1000 } };
+    if (systemPrompt) body.system_instruction = { parts: [{ text: systemPrompt }] };
+    const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    if (!res.ok) { const e = await res.json().catch(()=>({})); throw new Error(e.error?.message || 'HTTP ' + res.status); }
+    const d = await res.json();
+    return d.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  } else if (currentProvider === 'openai') {
+    // OpenAI format
+    const msgs = [];
+    if (systemPrompt) msgs.push({ role: 'system', content: systemPrompt });
+    msgs.push({ role: 'user', content: userPrompt });
+    const res = await fetch('https://api.openai.com/v1/chat/completions', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key }, body: JSON.stringify({ model: 'gpt-4o', messages: msgs, max_tokens: maxTokens || 1000 }) });
+    if (!res.ok) { const e = await res.json().catch(()=>({})); throw new Error(e.error?.message || 'HTTP ' + res.status); }
+    const d = await res.json();
+    return d.choices?.[0]?.message?.content || '';
+  } else {
+    // Groq (default)
+    const msgs = [];
+    if (systemPrompt) msgs.push({ role: 'system', content: systemPrompt });
+    msgs.push({ role: 'user', content: userPrompt });
+    const res = await fetch(GROQ_URL, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key }, body: JSON.stringify({ model: GROQ_MODEL, messages: msgs, max_tokens: maxTokens || 1000 }) });
+    if (!res.ok) { const e = await res.json().catch(()=>({})); throw new Error(e.error?.message || 'HTTP ' + res.status); }
+    const d = await res.json();
+    return d.choices?.[0]?.message?.content || '';
+  }
+}
+
+async function callGeminiChatRouted(history, systemPrompt, maxTokens) {
+  const saved = localStorage.getItem('chronicler_provider') || 'groq';
+  currentProvider = saved;
+  const key = localStorage.getItem('chronicler_key_' + currentProvider) || '';
+  if (!key) { showApiKeyModal(); throw new Error('No API key set.'); }
+
+  if (currentProvider === 'gemini') {
+    const url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' + key;
+    const contents = history.map(m => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] }));
+    const body = { contents, generationConfig: { maxOutputTokens: maxTokens || 1000 } };
+    if (systemPrompt) body.system_instruction = { parts: [{ text: systemPrompt }] };
+    const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    if (!res.ok) { const e = await res.json().catch(()=>({})); throw new Error(e.error?.message || 'HTTP ' + res.status); }
+    const d = await res.json();
+    return d.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  } else {
+    // OpenAI-compatible (Groq + OpenAI)
+    const endpoint = currentProvider === 'openai' ? 'https://api.openai.com/v1/chat/completions' : GROQ_URL;
+    const model    = currentProvider === 'openai' ? 'gpt-4o' : GROQ_MODEL;
+    const msgs = [];
+    if (systemPrompt) msgs.push({ role: 'system', content: systemPrompt });
+    history.forEach(m => msgs.push({ role: m.role === 'assistant' ? 'assistant' : 'user', content: m.content }));
+    const res = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key }, body: JSON.stringify({ model, messages: msgs, max_tokens: maxTokens || 1000 }) });
+    if (!res.ok) { const e = await res.json().catch(()=>({})); throw new Error(e.error?.message || 'HTTP ' + res.status); }
+    const d = await res.json();
+    return d.choices?.[0]?.message?.content || '';
+  }
+}
+
+// Patch the global callGemini and callGeminiChat to use the routed versions
+window.callGemini = callGeminiRouted;
+window.callGeminiChat = callGeminiChatRouted;
+
+// On load
+window.addEventListener('DOMContentLoaded', () => {
+  const saved = localStorage.getItem('chronicler_provider') || 'groq';
+  currentProvider = saved;
+  const key = localStorage.getItem('chronicler_key_' + currentProvider) || '';
+  if (!key) {
+    showApiKeyModal();
+  } else {
+    updateKeyIndicator();
+  }
+});
+
+</script>
+</body>
+</html>
